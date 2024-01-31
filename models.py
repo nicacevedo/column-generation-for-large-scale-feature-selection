@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from time import time, process_time
 
-from sklearn.linear_model import LinearRegression, Lasso
+from sklearn.linear_model import LinearRegression, Lasso, ElasticNet
 
 # from model_solver import GUROBI_MODEL
 
@@ -23,7 +23,7 @@ from sklearn.linear_model import LinearRegression, Lasso
 # Random seed
 np.random.seed(123)
 
-def SCIKIT_LASSO(X,y, tau_tilda, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
+def SCIKIT_LASSO(X,y, tau, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
     N,M = X.shape
     # =============================================================================
     #                                  SCIKIT LASSO
@@ -42,7 +42,7 @@ def SCIKIT_LASSO(X,y, tau_tilda, solver=cp.MOSEK, solver_params={}, solver_verbo
     
     # alpha = 2*tau/(2*n), because f.o.: 1/(2n)norm2 + alpha*norm1
     clf = Lasso(
-        alpha=tau_tilda/N, 
+        alpha=tau/N, 
         fit_intercept=False,
         max_iter=1e6,
         tol=1e-6
@@ -57,10 +57,48 @@ def SCIKIT_LASSO(X,y, tau_tilda, solver=cp.MOSEK, solver_params={}, solver_verbo
 
     z = beta # to fit the same format as the other models
 
-    lasso_value = np.linalg.norm(y - X @ beta)**2 + 2*tau_tilda * np.linalg.norm(beta, 1)
+    lasso_value = np.linalg.norm(y - X @ beta)**2 + 2*tau * np.linalg.norm(beta, 1)
 
     return beta, z, lasso_value, (t1-t0)/60, (t1p-t0p)/60, {}
  
+def SCIKIT_ElasticNet(X,y, tau, theta=0, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
+    N,M = X.shape
+    # =============================================================================
+    #                             SCIKIT Elastic Net
+    # =============================================================================
+    print("""
+    --------------------------------------------------
+                SCIKIT Elastic Net Model  
+    --------------------------------------------------
+    """)
+    t0 = time()
+    t0p = process_time()
+
+    # =============================================================================
+    #                             Model
+    # =============================================================================
+    
+    # alpha = 2*tau/(2*n), because f.o.: 1/(2n)norm2 + alpha*norm1
+    clf = ElasticNet(
+        alpha=(2*tau + theta)/(2*N), 
+        l1_ratio=2*tau/(2*tau + theta),
+        fit_intercept=False,
+        max_iter=1e6,
+        tol=1e-6
+        ) 
+    clf.fit(X, y)
+    beta = clf.coef_
+
+    t1 = time()
+    t1p = process_time()
+    print((t1-t0)/60, " mins (normal)")
+    print((t1p-t0p)/60, " mins (process)")
+
+    z = beta # to fit the same format as the other models
+
+    elastic_net_value = np.linalg.norm(y - X @ beta)**2 + (2 * tau ) * np.linalg.norm(beta, 1) + (0.5 * theta) * np.linalg.norm(beta)**2
+
+    return beta, z, elastic_net_value, (t1-t0)/60, (t1p-t0p)/60, {}
 
 def L_LASSO(X,y, tau_tilda, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
     N,M = X.shape
@@ -307,120 +345,10 @@ def MIP_R(X,y,tau_tilda,kappa_tilda, eps_sqrt=0, solver=cp.MOSEK, solver_params=
     return beta.value, xi.value, u.value, z.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
 
 
-def SOCP(X,y,tau_tilda,kappa_tilda, eps_sqrt=0, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
+def SOCP(X,y,tau, kappa, theta=0, eps_sqrt=0, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
     print("""
     --------------------------------------------------
                         SOCP Model
-    --------------------------------------------------
-    """)
-
-    N,M = X.shape
-     # =============================================================================
-    #                                   SOCP
-    # =============================================================================
-    
-    # Acotar el MIP
-    # m.setParam(GRB.Param.MIPGapAbs, 1e-1000)  # Gurobi should stop once |z_upper - z_lower | < 1e-1000
-    # m.setParam(GRB.Param.Threads, 10)           # Gurobi cores assigned to the problem
-    # m.setParam(GRB.Param.QCPDual, 1)            # Gurobi should calculate the dual variables
-    # m.setParam(GRB.Param.BarQCPConvTol, 1e-6)   # Gurobi should stop once the QCP barrier converges (dual-primal gap < 1e-6)
-    # m.setParam( 'OutputFlag', False )         # Gurobi should not print anything
-
-    t0 = time()
-    t0p = process_time()
-    
-    # =============================================================================
-    #                             Model Variables
-    # =============================================================================
-    
-    # 1. Continuous unbounded
-    beta = cp.Variable(M, name="beta", nonneg=False, boolean=False, integer=False)
-    xi   = cp.Variable(1, name="xi",   nonneg=False, boolean=False, integer=False)
-
-
-    # 2. Continuous positive 
-    u = cp.Variable(M, name="u", nonneg=True, boolean=False, integer=False)
-    z = cp.Variable(M, name="z", nonneg=True, boolean=False, integer=False)
-
-    # 3. Aux vector
-    aux_vector = cp.Variable((M, 2 + (eps_sqrt!=0)), name="aux_vector", nonneg=False, boolean=False, integer=False)
-    
-    # =============================================================================
-    #                             Model Constraints
-    # =============================================================================
-    
-    # 1. Auxiliar constraint for the quadratic multiplication of MVars on left side
-
-    # 2. Cone 1: Linnearization of the residuals norm
-    soc_1 = [
-        cp.SOC(
-            xi, 
-            y - X @ beta
-            )
-    ]
-
-    # 2. Auxiliar vector
-    aux_constr = [
-        aux_vector[i,0] == (u[i] - z[i]) for i in range(M)
-    ]
-    aux_constr += [
-        aux_vector[i,1] == 2*beta[i] for i in range(M)
-    ]
-    if eps_sqrt != 0:
-        aux_constr += [
-            aux_vector[i,2] == eps_sqrt for i in range(M)
-        ]
-
-    # 3. Cone 2_i: Conic form of the beta_i <= z_i * u_i constraint 
-    soc_2 = [
-        cp.SOC(
-            ( u[i] + z[i] ),
-            aux_vector[i,:]
-            ) for i in range(M)
-    ]
-    
-    # =============================================================================
-    #                             Objective Function
-    # =============================================================================
-    
-    # # 1. Penalization of the coefficients
-    # tau = error_quad_OLS/M
-    # kappa = tau
-
-    # tau_tilda = np.sqrt(error_quad_OLS)/(M**m_exp_rate)
-    # kappa_tilda = tau_tilda
-
-    # 2. Objective function
-    socp = cp.Problem(
-        cp.Minimize(
-            xi**2 + tau_tilda * (np.ones(M) @ z) + kappa_tilda * (np.ones(M) @ u)
-        ),
-        soc_1 + aux_constr + soc_2
-    )
-    
-    # t0 = time()
-    # t0p = process_time()
-    
-    socp.solve(
-        verbose=solver_verbose, 
-        solver=solver, 
-        **solver_params
-        # warm_start=True,
-        # Threads=10
-        )
-    
-    t1 = time()
-    t1p = process_time()
-    print((t1-t0)/60, " mins (normal)")
-    print((t1p-t0p)/60, " mins (process)")
-
-    return beta.value, xi.value, u.value, z.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
-
-# Elastic net SOCP
-def SOCP_EN(X,y,tau, kappa, theta, eps_sqrt=0, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
-    print("""
-    --------------------------------------------------
-                SOCP Elastic Net Model
     --------------------------------------------------
     """)
 
@@ -483,24 +411,25 @@ def SOCP_EN(X,y,tau, kappa, theta, eps_sqrt=0, solver=cp.MOSEK, solver_params={}
             ) for i in range(M)
     ]
     
+    # 4. Cone 3: Elastic net constraint (if theta > 0)
+    soc_3 = [
+        cp.SOC(
+            phi,
+            beta
+            )
+    ]
     # =============================================================================
     #                             Objective Function
     # =============================================================================
     
-    # # 1. Penalization of the coefficients
-    # tau = error_quad_OLS/M
-    # kappa = tau
-
-    # tau = np.sqrt(error_quad_OLS)/(M**m_exp_rate)
-    # kappa = tau
-
-    # 2. Objective function
+    # 1. Objective function
     socp = cp.Problem(
         cp.Minimize(
-            xi**2 + tau * (np.ones(M) @ z) + kappa * (np.ones(M) @ u)
+            xi**2 + tau * (np.ones(M) @ z) + kappa * (np.ones(M) @ u) + 0.5 * theta * phi**2
         ),
-        soc_1 + aux_constr + soc_2
+        soc_1 + aux_constr + soc_2 + soc_3
     )
+
     
     # t0 = time()
     # t0p = process_time()
@@ -518,7 +447,119 @@ def SOCP_EN(X,y,tau, kappa, theta, eps_sqrt=0, solver=cp.MOSEK, solver_params={}
     print((t1-t0)/60, " mins (normal)")
     print((t1p-t0p)/60, " mins (process)")
 
-    return beta.value, xi.value, u.value, z.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
+    return beta.value, xi.value, u.value, z.value, phi.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
+
+# # Elastic net SOCP
+# def SOCP_EN(X,y,tau, kappa, theta, eps_sqrt=0, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
+#     print("""
+#     --------------------------------------------------
+#                 SOCP Elastic Net Model
+#     --------------------------------------------------
+#     """)
+
+#     N,M = X.shape
+#      # =============================================================================
+#     #                                   SOCP
+#     # =============================================================================
+    
+#     t0 = time()
+#     t0p = process_time()
+    
+#     # =============================================================================
+#     #                             Model Variables
+#     # =============================================================================
+    
+#     # 1. Continuous unbounded
+#     beta = cp.Variable(M, name="beta", nonneg=False, boolean=False, integer=False)
+#     xi   = cp.Variable(1, name="xi",   nonneg=False, boolean=False, integer=False)
+#     phi  = cp.Variable(1, name="phi",   nonneg=False, boolean=False, integer=False)
+
+
+#     # 2. Continuous positive 
+#     u = cp.Variable(M, name="u", nonneg=True, boolean=False, integer=False)
+#     z = cp.Variable(M, name="z", nonneg=True, boolean=False, integer=False)
+
+#     # 3. Aux vector
+#     aux_vector = cp.Variable((M, 2 + (eps_sqrt!=0)), name="aux_vector", nonneg=False, boolean=False, integer=False)
+    
+#     # =============================================================================
+#     #                             Model Constraints
+#     # =============================================================================
+    
+#     # 1. Auxiliar constraint for the quadratic multiplication of MVars on left side
+
+#     # 2. Cone 1: Linnearization of the residuals norm
+#     soc_1 = [
+#         cp.SOC(
+#             xi, 
+#             y - X @ beta
+#             )
+#     ]
+
+#     # 2. Auxiliar vector
+#     aux_constr = [
+#         aux_vector[i,0] == (u[i] - z[i]) for i in range(M)
+#     ]
+#     aux_constr += [
+#         aux_vector[i,1] == 2*beta[i] for i in range(M)
+#     ]
+#     if eps_sqrt != 0:
+#         aux_constr += [
+#             aux_vector[i,2] == eps_sqrt for i in range(M)
+#         ]
+
+#     # 3. Cone 2_i: Conic form of the beta_i <= z_i * u_i constraint 
+#     soc_2 = [
+#         cp.SOC(
+#             ( u[i] + z[i] ),
+#             aux_vector[i,:]
+#             ) for i in range(M)
+#     ]
+
+#     # 4. Cone 3: Elastic net constraint
+#     soc_3 = [
+#         cp.SOC(
+#             phi,
+#             beta
+#             )
+#     ]
+    
+#     # =============================================================================
+#     #                             Objective Function
+#     # =============================================================================
+    
+#     # # 1. Penalization of the coefficients
+#     # tau = error_quad_OLS/M
+#     # kappa = tau
+
+#     # tau = np.sqrt(error_quad_OLS)/(M**m_exp_rate)
+#     # kappa = tau
+
+#     # 2. Objective function
+#     socp = cp.Problem(
+#         cp.Minimize(
+#             xi**2 + tau * (np.ones(M) @ z) + kappa * (np.ones(M) @ u) + theta * phi**2
+#         ),
+#         soc_1 + aux_constr + soc_2 + soc_3
+#     )
+    
+#     # t0 = time()
+#     # t0p = process_time()
+    
+#     socp.solve(
+#         verbose=solver_verbose, 
+#         solver=solver, 
+#         **solver_params
+#         # warm_start=True,
+#         # Threads=10
+#         )
+    
+#     t1 = time()
+#     t1p = process_time()
+#     print((t1-t0)/60, " mins (normal)")
+#     print((t1p-t0p)/60, " mins (process)")
+
+#     return beta.value, xi.value, u.value, z.value, phi.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
 
 
 # Dummy auxiliar class

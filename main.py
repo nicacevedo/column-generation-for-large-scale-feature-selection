@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import cvxpy as cp
 from os import cpu_count
 
-from models import SCIKIT_LASSO, L_LASSO, CG_SOC1_upgrade, SOCP
+from models import SCIKIT_LASSO, L_LASSO, CG_SOC1_upgrade, SOCP, SOCP_EN
 # Lasso: (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
 
 # Read data
