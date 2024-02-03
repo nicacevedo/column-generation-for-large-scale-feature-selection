@@ -367,7 +367,7 @@ def SOCP(X,y,tau, kappa, theta=0, eps_sqrt=0, solver=cp.MOSEK, solver_params={},
     # 1. Continuous unbounded
     beta = cp.Variable(M, name="beta", nonneg=False, boolean=False, integer=False)
     xi   = cp.Variable(1, name="xi",   nonneg=False, boolean=False, integer=False)
-    phi  = cp.Variable(1, name="phi",   nonneg=False, boolean=False, integer=False)
+    xi_2  = cp.Variable(1, name="xi_2",   nonneg=False, boolean=False, integer=False)
 
 
     # 2. Continuous positive 
@@ -414,7 +414,7 @@ def SOCP(X,y,tau, kappa, theta=0, eps_sqrt=0, solver=cp.MOSEK, solver_params={},
     # 4. Cone 3: Elastic net constraint (if theta > 0)
     soc_3 = [
         cp.SOC(
-            phi,
+            xi_2,
             beta
             )
     ]
@@ -425,7 +425,7 @@ def SOCP(X,y,tau, kappa, theta=0, eps_sqrt=0, solver=cp.MOSEK, solver_params={},
     # 1. Objective function
     socp = cp.Problem(
         cp.Minimize(
-            xi**2 + tau * (np.ones(M) @ z) + kappa * (np.ones(M) @ u) + 0.5 * theta * phi**2
+            xi**2 + tau * (np.ones(M) @ z) + kappa * (np.ones(M) @ u) + 0.5 * theta * xi_2**2
         ),
         soc_1 + aux_constr + soc_2 + soc_3
     )
@@ -447,119 +447,7 @@ def SOCP(X,y,tau, kappa, theta=0, eps_sqrt=0, solver=cp.MOSEK, solver_params={},
     print((t1-t0)/60, " mins (normal)")
     print((t1p-t0p)/60, " mins (process)")
 
-    return beta.value, xi.value, u.value, z.value, phi.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
-
-# # Elastic net SOCP
-# def SOCP_EN(X,y,tau, kappa, theta, eps_sqrt=0, solver=cp.MOSEK, solver_params={}, solver_verbose=False):
-#     print("""
-#     --------------------------------------------------
-#                 SOCP Elastic Net Model
-#     --------------------------------------------------
-#     """)
-
-#     N,M = X.shape
-#      # =============================================================================
-#     #                                   SOCP
-#     # =============================================================================
-    
-#     t0 = time()
-#     t0p = process_time()
-    
-#     # =============================================================================
-#     #                             Model Variables
-#     # =============================================================================
-    
-#     # 1. Continuous unbounded
-#     beta = cp.Variable(M, name="beta", nonneg=False, boolean=False, integer=False)
-#     xi   = cp.Variable(1, name="xi",   nonneg=False, boolean=False, integer=False)
-#     phi  = cp.Variable(1, name="phi",   nonneg=False, boolean=False, integer=False)
-
-
-#     # 2. Continuous positive 
-#     u = cp.Variable(M, name="u", nonneg=True, boolean=False, integer=False)
-#     z = cp.Variable(M, name="z", nonneg=True, boolean=False, integer=False)
-
-#     # 3. Aux vector
-#     aux_vector = cp.Variable((M, 2 + (eps_sqrt!=0)), name="aux_vector", nonneg=False, boolean=False, integer=False)
-    
-#     # =============================================================================
-#     #                             Model Constraints
-#     # =============================================================================
-    
-#     # 1. Auxiliar constraint for the quadratic multiplication of MVars on left side
-
-#     # 2. Cone 1: Linnearization of the residuals norm
-#     soc_1 = [
-#         cp.SOC(
-#             xi, 
-#             y - X @ beta
-#             )
-#     ]
-
-#     # 2. Auxiliar vector
-#     aux_constr = [
-#         aux_vector[i,0] == (u[i] - z[i]) for i in range(M)
-#     ]
-#     aux_constr += [
-#         aux_vector[i,1] == 2*beta[i] for i in range(M)
-#     ]
-#     if eps_sqrt != 0:
-#         aux_constr += [
-#             aux_vector[i,2] == eps_sqrt for i in range(M)
-#         ]
-
-#     # 3. Cone 2_i: Conic form of the beta_i <= z_i * u_i constraint 
-#     soc_2 = [
-#         cp.SOC(
-#             ( u[i] + z[i] ),
-#             aux_vector[i,:]
-#             ) for i in range(M)
-#     ]
-
-#     # 4. Cone 3: Elastic net constraint
-#     soc_3 = [
-#         cp.SOC(
-#             phi,
-#             beta
-#             )
-#     ]
-    
-#     # =============================================================================
-#     #                             Objective Function
-#     # =============================================================================
-    
-#     # # 1. Penalization of the coefficients
-#     # tau = error_quad_OLS/M
-#     # kappa = tau
-
-#     # tau = np.sqrt(error_quad_OLS)/(M**m_exp_rate)
-#     # kappa = tau
-
-#     # 2. Objective function
-#     socp = cp.Problem(
-#         cp.Minimize(
-#             xi**2 + tau * (np.ones(M) @ z) + kappa * (np.ones(M) @ u) + theta * phi**2
-#         ),
-#         soc_1 + aux_constr + soc_2 + soc_3
-#     )
-    
-#     # t0 = time()
-#     # t0p = process_time()
-    
-#     socp.solve(
-#         verbose=solver_verbose, 
-#         solver=solver, 
-#         **solver_params
-#         # warm_start=True,
-#         # Threads=10
-#         )
-    
-#     t1 = time()
-#     t1p = process_time()
-#     print((t1-t0)/60, " mins (normal)")
-#     print((t1p-t0p)/60, " mins (process)")
-
-#     return beta.value, xi.value, u.value, z.value, phi.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
+    return beta.value, xi.value, u.value, z.value, xi_2.value, socp.value, (t1-t0)/60, (t1p-t0p)/60, {}
 
 
 # Dummy auxiliar class
@@ -902,7 +790,7 @@ def CG_SOC1_upgrade(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         soc_1 = [
             cp.SOC(
                 xi_k, 
-                y - np.round(X @ beta_k, 4) @ pi_k
+                y - X @ beta_k @ pi_k
                 )
         ]
 
@@ -1098,11 +986,11 @@ def CG_SOC1_upgrade(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         # print((m, v))
         # Check condition of |psi_k_sol.T @ X| > tau_tilda + kappa_tilda (-inf inmediately) 
         # It's a best bound than |psi_k_sol.T @ X| > 0. Only possible because of b_i^2 <= z_i*u_i
-        # lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) > tau_tilda + kappa_tilda).any() if not dummy_condition else False
-        # lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) > 2*np.sqrt(kappa_tilda*tau_tilda)).any() if not dummy_condition else False
-        lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda) > -cg_lambda_tol).any() if not dummy_condition else False
+        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > tau_tilda + kappa_tilda).any() if not dummy_condition else False
+        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > 2*np.sqrt(kappa_tilda*tau_tilda)).any() if not dummy_condition else False
+        lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda) > -cg_lambda_tol).any() if not dummy_condition else False
         
-        if not lagrange_divergence_conditon:
+        if not lagrange_boundedness_conditon:
             # print('condition min diff:')
             # print(np.max(np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda)))
 
@@ -1380,8 +1268,7 @@ def CG_SOC1_upgrade(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
 
         k += 1
 
-# New module formulation
-def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK, 
+def CG_SOC1_ElasticNet(X,y,tau,kappa, theta=0, eps_soc2_sqrt=0, solver=cp.MOSEK, 
     solver_params={'mosek_params': {'MSK_DPAR_INTPNT_CO_TOL_REL_GAP':1e-6}}, solver_verbose=False, 
     eps_soc2_sqrt_L=0, add_constant=True, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
     solve_dual_directly=False, cg_lambda_tol=1e-6, cg_residuals_tol=1e-6,
@@ -1426,7 +1313,8 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
     if add_constant:
 
         # original
-        constant_column = np.random.choice([-1,1], size=(m,1), replace=True) #np.ones((m,1), dtype=float)
+        constant_column = np.ones((m,1), dtype=float)
+        # constant_column = np.random.choice([-1,1], size=(m,1), replace=True) #np.ones((m,1), dtype=float)
         beta_k = np.concatenate((constant_column, rand_beta_k), axis=1)
         # beta_k = np.concatenate((np.ones((m,1)), rand_beta_k), axis=1)
         v0 +=1
@@ -1452,8 +1340,8 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
     # new
     z_k =       np.zeros((m, (v0-1)+k+(v-1)*k_v), dtype=float)
     u_k =       np.zeros((m, (v0-1)+k+(v-1)*k_v), dtype=float)
-    z_k[beta_k != 0] = 1*np.sqrt(kappa_tilda/tau_tilda)
-    u_k[beta_k != 0] = 1*np.sqrt(tau_tilda/kappa_tilda)
+    z_k[beta_k != 0] = 1*np.sqrt(kappa/tau)
+    u_k[beta_k != 0] = 1*np.sqrt(tau/kappa)
 
     # First vector of dual variables
     lambda_k_1 = np.array([None])
@@ -1502,16 +1390,15 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         #                          Model: Master Problem
         # =============================================================================
 
-        m = GUROBI_MODEL()
-
         # =============================================================================
         #                             Model Variables
         # =============================================================================
         
         # 1. Continuous unbounded
-        pi_k = m.add_variable((v0-1)+k+(v-1)*k_v, name="pi_k") # (v0-1)+k+(v-1)*k_v variables bc of the first iteration and v_sols (5 solutions)
+        # pi_k = cp.Variable(k+v-1, name="pi_k") # 4+k variables bc of the first iteration (5 solutions)
         pi_k = cp.Variable((v0-1)+k+(v-1)*k_v, name="pi_k") # (v0-1)+k+(v-1)*k_v variables bc of the first iteration and v_sols (5 solutions)
         xi_k = cp.Variable(1, name="xi_k")
+        xi_k_2 = cp.Variable(1, name="xi_k_2")
         
         # =============================================================================
         #                             Model Constraints
@@ -1521,7 +1408,7 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         soc_1 = [
             cp.SOC(
                 xi_k, 
-                y - np.round(X @ beta_k, 4) @ pi_k
+                y - X @ beta_k @ pi_k
                 )
         ]
 
@@ -1556,6 +1443,14 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
             z_k @ pi_k >= 0
         ]
 
+        # 5. Elastic net constraint
+        soc_3 = [
+            cp.SOC(
+                xi_k_2, 
+                beta_k @ pi_k   
+            )
+        ]
+
         # =============================================================================
         #                             Objective Function
         # =============================================================================
@@ -1563,20 +1458,20 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         # 2. Objective function
         socp = cp.Problem(
             cp.Minimize(
-                xi_k**2 + tau_tilda * cp.sum( z_k @ pi_k ) + kappa_tilda * cp.sum( u_k @ pi_k )
+                xi_k**2 + tau * cp.sum( z_k @ pi_k ) + kappa * cp.sum( u_k @ pi_k ) + 0.5 * theta * xi_k_2**2
             ),
-            soc_1 + soc_2 + wei_sum + u_z_pos
+            soc_1 + soc_2 + wei_sum + u_z_pos + soc_3
         )
 
-        print("Master problem values")
-        print("tau_tilda:", tau_tilda)
-        print("kappa_tilda:", kappa_tilda)
-        print("beta_k:", beta_k)
-        print("X", X )
-        print("X @ beta_k:", X @ beta_k)
-        print("y:", y)
-        print("z_k:", z_k)
-        print("u_k:", u_k)
+        # print("Master problem values")
+        # print("tau:", tau)
+        # print("kappa:", kappa)
+        # print("beta_k:", beta_k)
+        # print("X", X )
+        # print("X @ beta_k:", X @ beta_k)
+        # print("y:", y)
+        # print("z_k:", z_k)
+        # print("u_k:", u_k)
         
 
         
@@ -1627,23 +1522,29 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         z_k_sol = z_k @ pi_k_sol
         u_k_sol = u_k @ pi_k_sol
         xi_k_sol = xi_k.value
+        xi_k_2_sol = xi_k_2.value
+
 
         # 2. Dual variable 
         if not solve_dual_directly:
             soc_1_k_sol = np.array([soc_1[x].dual_value for x in range(len(soc_1))], dtype=object)
+            soc_3_k_sol = np.array([soc_3[x].dual_value for x in range(len(soc_3))], dtype=object)
 
             # If it can compute the dual variable, it will be stored in the lambda_k_1 vector
             if soc_1_k_sol.any(): 
                 psi_k_sol = soc_1_k_sol[0][1]
                 mu_k_sol = soc_1_k_sol[0][0][0]
+
+                phi_k_sol = soc_3_k_sol[0][1]
+                mu_2_k_sol = soc_3_k_sol[0][0][0]
             else:
                 print("Primal-Dual gap is too big, no dual solution")
                 print("Solving dual problem... (directly)")
                 
-                psi_k_sol, mu_k_sol, alpha_gamma_k, delta_k_sol, dual_time, dual_p_time = masters_dual(X, y, tau_tilda, kappa_tilda, beta_k, z_k, u_k, k, v, k_v, v0, sum_1_comb, pos_linear_comb,  solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
+                psi_k_sol, mu_k_sol, alpha_gamma_k, delta_k_sol, dual_time, dual_p_time = masters_dual(X, y, tau, kappa, beta_k, z_k, u_k, k, v, k_v, v0, sum_1_comb, pos_linear_comb,  solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
                 solved_duals.append(k)
         else:
-            psi_k_sol, mu_k_sol, alpha_gamma_k, delta_k_sol, dual_time, dual_p_time  = masters_dual(X, y, tau_tilda, kappa_tilda, beta_k, z_k, u_k, k, v, k_v, v0, sum_1_comb, pos_linear_comb, solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
+            psi_k_sol, mu_k_sol, alpha_gamma_k, delta_k_sol, dual_time, dual_p_time  = masters_dual(X, y, tau, kappa, beta_k, z_k, u_k, k, v, k_v, v0, sum_1_comb, pos_linear_comb, solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
             solved_duals.append(k)
 
         # Save convergence info
@@ -1659,7 +1560,9 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         #==============================================================================
 
         # Aggregation of the dual variables in a single vector
-        lambda_k = np.append(psi_k_sol, mu_k_sol )
+        lambda_k = np.append(psi_k_sol, mu_k_sol)
+        lambda_k = np.append(lambda_k, phi_k_sol)
+        lambda_k = np.append(lambda_k, mu_2_k_sol)
 
         # Check if lamda_k is equal to lambda_k_1. If so, stop the algorithm.
         # If not, continue the algorithm. Then, update the lambda_k_1 with the lambda_k.
@@ -1697,7 +1600,7 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
                 # print("Error medio:", np.sqrt(error_quad))	
 
                 # return beta, xi, u, z, aux_vector, socp, (t1-t0)/60, (t1p-t0p)/60
-                return beta_final_sol, xi_k_sol, u_k_sol, z_k_sol, socp.value, (t1_cg - t0_cg)/60, (t1p_cg - t0p_cg)/60, {
+                return beta_final_sol, xi_k_sol, u_k_sol, z_k_sol, xi_k_2_sol, socp.value, (t1_cg - t0_cg)/60, (t1p_cg - t0p_cg)/60, {
                     'k':k, 'k_v':k_v, 'master_values':master_values, 'lagrangian_values':lagrangian_values, 'dual_values':dual_values, 
                     'master_times':master_times, 'lagrangian_times':lagrangian_times, 'dual_times':dual_times,
                     'master_p_times':master_p_times, 'lagrangian_p_times':lagrangian_p_times, 'dual_p_times':dual_p_times,
@@ -1715,15 +1618,15 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         #                             Second Stopping Criterion
         #==============================================================================
         # print((m, v))
-        # Check condition of |psi_k_sol.T @ X| > tau_tilda + kappa_tilda (-inf inmediately) 
+        # Check condition of |psi_k_sol.T @ X| > tau + kappa (-inf inmediately) 
         # It's a best bound than |psi_k_sol.T @ X| > 0. Only possible because of b_i^2 <= z_i*u_i
-        # lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) > tau_tilda + kappa_tilda).any() if not dummy_condition else False
-        # lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) > 2*np.sqrt(kappa_tilda*tau_tilda)).any() if not dummy_condition else False
-        lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda) > -cg_lambda_tol).any() if not dummy_condition else False
+        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > tau + kappa).any() if not dummy_condition else False
+        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > 2*np.sqrt(kappa*tau)).any() if not dummy_condition else False
+        lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X - phi_k_sol) - 2*np.sqrt(kappa*tau) > -cg_lambda_tol).any() if not dummy_condition else False
         
-        if not lagrange_divergence_conditon:
+        if not lagrange_boundedness_conditon:
             # print('condition min diff:')
-            # print(np.max(np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda)))
+            # print(np.max(np.abs(psi_k_sol.T @ X - phi_k_sol) - 2*np.sqrt(kappa*tau)))
 
             # =============================================================================
             #                             Lagrangian Model
@@ -1734,7 +1637,8 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
 
             # 1. Continuous unbounded
             beta = cp.Variable(m, name="beta", nonneg=False)
-            # xi = cp.Variable(1, name="xi", nonneg=True)
+            # xi = cp.Variable(1, name="xi", nonneg=True)¨
+            xi_2 = cp.Variable(1, name="xi_2", nonneg=True)
 
             # 2. Continuous positive 
             z = cp.Variable(m, name="z", nonneg=True)
@@ -1776,12 +1680,15 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
             L = cp.Problem(
                 cp.Minimize(
                     0 \
-                    # + xi**2 - mu_k_sol*xi  # irrelevant for this case
+                    # + (xi - mu_k_sol)*xi  # irrelevant for this case (direct solution down below with xi* = mu_k_sol / 2)
                     + (- mu_k_sol/2) * mu_k_sol/2 \
                     + psi_k_sol.T @ X @ beta \
-                    + tau_tilda * cp.sum(z) \
-                    + kappa_tilda * cp.sum(u) \
-                    - psi_k_sol.T @ y # Constant (may be removed)
+                    + tau * cp.sum(z) \
+                    + kappa * cp.sum(u) \
+                     # Constant down below (may be removed)
+                    - psi_k_sol.T @ y \
+                    # + (0.5 * theta * xi_2 - mu_2_k_sol) * xi_2 # irrelevant for this case (direct solution down below with xi_2* = mu_2_k_sol / theta)
+                    + (- mu_2_k_sol/2) * mu_2_k_sol/theta
                 ),
                 aux_constr + soc_2_L
             )
@@ -1864,15 +1771,15 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
             v_indices_pos = v_indices[v_constraint[v_indices] <= 0]
             s_pos = range(len(v_indices_pos))#range(len(v_indices_neg),v)
             beta_sol[v_indices_pos, s_pos] = 1
-            z_sol[v_indices_pos, s_pos] = 1*np.sqrt(kappa_tilda/tau_tilda)
-            u_sol[v_indices_pos, s_pos] = 1*np.sqrt(tau_tilda/kappa_tilda)
+            z_sol[v_indices_pos, s_pos] = 1*np.sqrt(kappa/tau)
+            u_sol[v_indices_pos, s_pos] = 1*np.sqrt(tau/kappa)
 
             # negative beta
             v_indices_neg = v_indices[v_constraint[v_indices] > 0]
             s_neg = range(len(v_indices_pos),v)#range(len(v_indices_neg))
             beta_sol[v_indices_neg, s_neg] = -1
-            z_sol[v_indices_neg, s_neg] = 1*np.sqrt(kappa_tilda/tau_tilda)
-            u_sol[v_indices_neg, s_neg] = 1*np.sqrt(tau_tilda/kappa_tilda)
+            z_sol[v_indices_neg, s_neg] = 1*np.sqrt(kappa/tau)
+            u_sol[v_indices_neg, s_neg] = 1*np.sqrt(tau/kappa)
 
             # Update k_v
             k_v += 1
@@ -1885,6 +1792,7 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
             z_sol      = z.value
             u_sol      = u.value
             xi_sol     = mu_k_sol/2
+            xi_2_sol   = mu_2_k_sol/theta
 
 
         # =============================================================================
@@ -1956,22 +1864,7 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
                 # print("Error cuadratico:", error_quad)	
                 # print("Error medio:", np.sqrt(error_quad))	
 
-                # add the following to the return final dict
-                # master_values = []
-                # lagrangian_values = []
-                # dual_values = []
-
-                # # solver times
-                # master_times = []
-                # lagrangian_times = []
-                # dual_times = []
-
-                # # solver p_times
-                # master_p_times = []
-                # lagrangian_p_times = []
-                # dual_p_times = []
-                # solved_duals = []
-                return beta_final_sol, xi_k_sol, u_k_sol, z_k_sol, L.value, (t1_cg - t0_cg)/60, (t1p_cg - t0p_cg)/60, {
+                return beta_final_sol, xi_k_sol, u_k_sol, z_k_sol, xi_k_2_sol, socp.value, (t1_cg - t0_cg)/60, (t1p_cg - t0p_cg)/60, {
                     'k':k, 'k_v':k_v, 'master_values':master_values, 'lagrangian_values':lagrangian_values, 'dual_values':dual_values, 
                     'master_times':master_times, 'lagrangian_times':lagrangian_times, 'dual_times':dual_times,
                     'master_p_times':master_p_times, 'lagrangian_p_times':lagrangian_p_times, 'dual_p_times':dual_p_times,
@@ -1998,6 +1891,9 @@ def CG_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
             u_k = np.append(u_k, u_sol, axis=1)
 
         k += 1
+
+
+
 
 def CG_SOC1_SOC2_upgrade(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
     solver_params={'mosek_params': {'MSK_DPAR_INTPNT_CO_TOL_REL_GAP':1e-6}}, solver_verbose=False, 
@@ -2344,10 +2240,10 @@ def CG_SOC1_SOC2_upgrade(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.M
         # Check condition of psi_k_sol.T @ X > tau_tilda + kappa_tilda (-inf inmediately)
         # if not (np.abs(psi_k_sol.T @ X) > tau_tilda + kappa_tilda).any():
         # x != 0 <=> |x| > epsilon
-        lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X - 2*gamma_k_sol) > cg_lambda_tol).any() or \
+        lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X - 2*gamma_k_sol) > cg_lambda_tol).any() or \
             (tau_tilda + alpha_k_sol - delta_k_sol < -cg_lambda_tol).any() or \
             (kappa_tilda - alpha_k_sol + delta_k_sol < 0).any() if not dummy_condition else False
-        if not lagrange_divergence_conditon: # [assuming symmetry of tau/kappa]
+        if not lagrange_boundedness_conditon: # [assuming symmetry of tau/kappa]
             # not (kappa_tilda - alpha_k_sol + delta_k_sol < 0).any():# and \ (previous line)
 
             # =============================================================================
@@ -2955,9 +2851,9 @@ def CG_SOC2(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         #==============================================================================
 
         # Check condition of (tau + alpha - gamma) < 0  (-inf inmediately) [case: symmetric kappa/tau]
-        lagrange_divergence_conditon = ((tau_tilda + alpha_k_sol - gamma_k_sol < -cg_lambda_tol).any() or \
+        lagrange_boundedness_conditon = ((tau_tilda + alpha_k_sol - gamma_k_sol < -cg_lambda_tol).any() or \
             (kappa_tilda - alpha_k_sol - gamma_k_sol < 0).any()) if not dummy_condition else False
-        if not lagrange_divergence_conditon: #+ alpha_k_sol
+        if not lagrange_boundedness_conditon: #+ alpha_k_sol
             # and not (kappa_tilda - alpha_k_sol - gamma_k_sol < 0).any():
 
             # =============================================================================
@@ -3533,11 +3429,11 @@ def CG_LASSO_SOC1(X,y,tau_tilda,kappa_tilda, eps_soc2_sqrt=0, solver=cp.MOSEK,
         # print((m, v))
         # Check condition of |psi_k_sol.T @ X| > tau_tilda + kappa_tilda (-inf inmediately) 
         # It's a best bound than |psi_k_sol.T @ X| > 0. Only possible because of b_i^2 <= z_i*u_i
-        # lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) > tau_tilda + kappa_tilda).any() if not dummy_condition else False
-        # lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) > 2*np.sqrt(kappa_tilda*tau_tilda)).any() if not dummy_condition else False
-        lagrange_divergence_conditon = (np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda) > -cg_lambda_tol).any() if not dummy_condition else False
+        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > tau_tilda + kappa_tilda).any() if not dummy_condition else False
+        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > 2*np.sqrt(kappa_tilda*tau_tilda)).any() if not dummy_condition else False
+        lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda) > -cg_lambda_tol).any() if not dummy_condition else False
         
-        if not lagrange_divergence_conditon:
+        if not lagrange_boundedness_conditon:
             # print('condition min diff:')
             # print(np.max(np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa_tilda*tau_tilda)))
 

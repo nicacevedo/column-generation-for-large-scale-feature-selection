@@ -9,7 +9,7 @@ import clarabel
 import gurobipy as gp
 from os import cpu_count
 
-from models import CG_SOC1_upgrade, SOCP, SCIKIT_ElasticNet
+from models import CG_SOC1_upgrade, SOCP, SCIKIT_ElasticNet, CG_SOC1_ElasticNet
 # import mosek as MSK
 
 # Write a seond order cone program in Gurobi format.
@@ -55,8 +55,8 @@ from models import CG_SOC1_upgrade, SOCP, SCIKIT_ElasticNet
 
 if __name__ == "__main__":
     # Sample of the data
-    final_results = [['model','sample_size', 'solver', 'error_quad', 'fo_value','time', 'time_process', 'status', 'tau', 'kappa', 'alpha', 'theta']]
-    for sample_size in [100,200, 300, 400, 500]:#, 1000, 1500, 2000,2440]: # 100, 500, 1000,1500, 2000,  
+    final_results = [['model','sample_size', 'solver', 'OLS_error_quad', 'error_quad', 'fo_value','time', 'time_process', 'n_betas','status', 'tau', 'kappa', 'alpha', 'theta']]
+    for sample_size in [500, 1000, 1500, 2000,2440]:#, 400, 500, 1000, 1500, 2000,2440]: # 100, 500, 1000,1500, 2000,  
 
         X = pd.read_csv('real-data-treated/usa_n3522_m2440_yr2010_filled.csv', index_col=0, header=0)
         y = pd.read_csv('real-data/s&p_n3522_yr2010.csv', index_col=0, header=0)
@@ -86,124 +86,219 @@ if __name__ == "__main__":
         # Params
         eps_sqrt = 0
         init_tau = error_quad_OLS
-        tau_tilda = init_tau ** 7  # tau = tau_tilda / alpha, and kappa = alpha **2 *  tau
+       
 
+        for tau_exp in [-1,0,1]: # all previuos experiments were with tau_exp = 7
+            for theta_exp in [-7,-2,2,7]:
+                tau_tilda = init_tau ** tau_exp  # tau = tau_tilda / alpha, and kappa = alpha **2 *  tau
+                # 1/error bc it's a decimal number in most cases
 
+                # for alpha_ in [.2, .4, .6, .8,  1]:
+                alpha_ = 1
+                if True:
+                    alpha = 1/alpha_
+                    # tau = (1 - ratio) * tau_tilda
+                    tau = tau_tilda / alpha 
+                    # kappa =  
+                    kappa = alpha ** 2 * tau
+                    print('tau2', tau, 'kappa', kappa, 'alpha', alpha)
+                    print('sqrt(tau*kappa)', np.sqrt(tau*kappa), 'sqrt(tau_tilda**2)', tau_tilda)
+                    theta = init_tau ** theta_exp
 
-        # for alpha_ in [.2, .4, .6, .8,  1]:
-        alpha_ = 1
-        if True:
-            alpha = 1/alpha_
-            # tau = (1 - ratio) * tau_tilda
-            tau = tau_tilda / alpha
-            # kappa =  
-            kappa = alpha ** 2 * tau
-            print('tau2', tau, 'kappa', kappa, 'alpha', alpha)
-            print('sqrt(tau*kappa)', np.sqrt(tau*kappa), 'sqrt(tau_tilda**2)', tau_tilda)
-            theta = tau
-
-            solver_verbose = False
-            solvers = ['MOSEK'] # ,  'CVXOPT', 'MOSEK', 'GUROBI', 'ECOS', 'ECOS_BB', 'SCS'
-            add_constant = False
-            time_limit = 90
-            for solver in solvers:
-                for i in range(1):
-                    # solver = solvers[-1]
-                    tol = 1e-6
-                    solver_params_ =  {
-                        'GUROBI': {
-                            'BarConvTol':tol,
-                            'BarQCPConvTol':tol
-                        },
-                        'MOSEK': {
-                            'mosek_params':{
-                            'MSK_DPAR_INTPNT_CO_TOL_REL_GAP':tol,
-                            'MSK_IPAR_NUM_THREADS': cpu_count(),
+                    solver_verbose = False
+                    solvers = ['MOSEK'] # ,  'CVXOPT', 'MOSEK', 'GUROBI', 'ECOS', 'ECOS_BB', 'SCS'
+                    add_constant = False
+                    time_limit = 90
+                    for solver in solvers:
+                        for i in range(1):
+                            # solver = solvers[-1]
+                            tol = 1e-6
+                            solver_params_ =  {
+                                'GUROBI': {
+                                    'BarConvTol':tol,
+                                    'BarQCPConvTol':tol
+                                },
+                                'MOSEK': {
+                                    'mosek_params':{
+                                    'MSK_DPAR_INTPNT_CO_TOL_REL_GAP':tol,
+                                    'MSK_IPAR_NUM_THREADS': cpu_count(),
+                                    }
+                                },
+                                'ECOS': {
+                                    'abstol':tol,
+                                    'reltol':tol,
+                                    'feastol':tol,
+                                },
+                                'ECOS_BB': {
+                                    'abstol':tol,
+                                    'reltol':tol,
+                                    'feastol':tol,
+                                },
+                                'OSQP': {
+                                    'eps_abs':tol,
+                                    'eps_rel':tol,
+                                },
+                                'SCS': {
+                                    'eps':tol,
+                                },
+                                'CVXOPT': {
+                                    'abstol':tol,
+                                    'reltol':tol,
+                                    'feastol':tol,
+                                },
+                                'COPT': {
+                                    'AbsGap':tol,
+                                },
+                                'CLARABEL': {
+                                    'tol_gap_abs':tol,
+                                },
                             }
-                        },
-                        'ECOS': {
-                            'abstol':tol,
-                            'reltol':tol,
-                            'feastol':tol,
-                        },
-                        'ECOS_BB': {
-                            'abstol':tol,
-                            'reltol':tol,
-                            'feastol':tol,
-                        },
-                        'OSQP': {
-                            'eps_abs':tol,
-                            'eps_rel':tol,
-                        },
-                        'SCS': {
-                            'eps':tol,
-                        },
-                        'CVXOPT': {
-                            'abstol':tol,
-                            'reltol':tol,
-                            'feastol':tol,
-                        },
-                        'COPT': {
-                            'AbsGap':tol,
-                        },
-                        'CLARABEL': {
-                            'tol_gap_abs':tol,
-                        },
-                    }
-                    solver_params = solver_params_[solver]
+                            solver_params = solver_params_[solver]
 
 
-                    # Model 
-                    # results = CG_SOC1_upgrade(
-                    #                         X, y, tau, kappa, eps_sqrt, solver, solver_params, solver_verbose, 
-                    #                         eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
-                    #                         solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
-                    #                         v=max(int(n*0.012), 5), v0=max(int(n*0.012), 5), time_limit=time_limit, dummy_condition=False,
-                    #                         canonic_random_initial_sol=True
-                    #                         )
+                            # SOCP
+                            beta, xi, u, z, xi_2, fo_value, time, p_time_mins, cg_dict = SOCP(X,y,tau,kappa, theta=theta,eps_sqrt=eps_sqrt, solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
 
-                    # results = SOCP(X,y,tau,kappa, eps_sqrt=eps_sqrt, solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
-                    
-                    results = SOCP(X,y,tau,kappa, theta=theta,eps_sqrt=eps_sqrt, solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
-                    
-                    beta, xi, u, z, phi, fo_value, time, p_time_mins, cg_dict = results
-
-                    # Error of the solution
-                    # if socp.status == 'optimal':
-                    try:
-                        error_quad = np.linalg.norm(y - X @ beta) **2
-                    # else:
-                    except Exception as e:
-                        error_quad = None
-                    # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
-                    final_results.append(['SOCP',sample_size, solver, error_quad, fo_value, time, p_time_mins, 'converged', tau, kappa, alpha, theta])
-                    print(error_quad)
+                            # Error of the solution
+                            # if socp.status == 'optimal':
+                            try:
+                                error_quad = np.linalg.norm(y - X @ beta) **2
+                            # else:
+                            except Exception as e:
+                                error_quad = None
+                            # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
+                            final_results.append(['SOCP',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size,'converged', tau, kappa, alpha, theta])
+                            print(error_quad)
 
 
-                    # Elastic Net
-                    results = SCIKIT_ElasticNet(X, y, tau, theta=theta)
+                            # # Elastic Net
+                            # beta, z, fo_value, time, p_time_mins, cg_dict = SCIKIT_ElasticNet(X, y, tau, theta=theta)
 
-                    beta, z, fo_value, time, p_time_mins, cg_dict = results
+                            # # Error of the solution
+                            # # if socp.status == 'optimal':
+                            # try:
+                            #     error_quad = np.linalg.norm(y - X @ beta) **2
+                            # # else:
+                            # except Exception as e:
+                            #     error_quad = None
+                            # final_results.append(['SCIKIT_ElasticNet', sample_size, 'coordinate descent', error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau, kappa, alpha, theta])
+                            # print(error_quad)
 
-                    # Error of the solution
-                    # if socp.status == 'optimal':
-                    try:
-                        error_quad = np.linalg.norm(y - X @ beta) **2
-                    # else:
-                    except Exception as e:
-                        error_quad = None
-                    final_results.append(['SCIKIT_ElasticNet', sample_size, 'coordinate descent', error_quad, fo_value, time, p_time_mins, 'converged', tau, kappa, alpha, theta])
-                    print(error_quad)
+                            # CG method
+                            beta, xi, u, z, xi_2, fo_value, time, p_time_mins, cg_dict = CG_SOC1_ElasticNet(
+                                                    X, y, tau, kappa, theta=theta, 
+                                                    eps_soc2_sqrt=eps_sqrt, solver=solver, 
+                                                    solver_params=solver_params, solver_verbose=solver_verbose,
+                                                    eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
+                                                    solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
+                                                    v=max(int(n*0.012), 5), v0=max(int(n*0.012), 5), time_limit=time_limit, dummy_condition=False,
+                                                    canonic_random_initial_sol=True
+                                                    )
 
-                    # Error of the solution
-                    # Save final_results in a csv file
-                    df_final_results = pd.DataFrame(final_results[1:], columns=final_results[0])
-                    # df_final_results.to_csv('results/benchmark/real-data-solver-benchmark.csv', index=False)
+                            # Error of the solution
+                            # if socp.status == 'optimal':
+                            try:
+                                error_quad = np.linalg.norm(y - X @ beta) **2
+                            # else:
+                            except Exception as e:
+                                error_quad = None
+                            # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
+                            final_results.append(['CG_SOC1_ElasticNet',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau, kappa, alpha, theta])
+                            print(error_quad)
 
+
+
+                            # Error of the solution
+                            # Save final_results in a csv file
+                            df_final_results = pd.DataFrame(final_results[1:], columns=final_results[0])
+                            # df_final_results.to_csv('results/benchmark/real-data-solver-benchmark.csv', index=False)
+                            df_final_results.to_csv('results/elastic-net/socp_CG_comparison.csv', index=False)
 
 
 # %%
-# df_final_results.to_csv('results/elastic-net/socp_scikit_comparison.csv', index=False)
+# df_final_results.to_csv('results/elastic-net/socp_CG_comparison.csv', index=False)
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+df_results = pd.read_csv('results/elastic-net/socp_CG_comparison.csv')
+df_results.head()
+
+# plot the three models times as a function of tau/theta
+for sample_size in df_results['sample_size'].unique():
+    plt.figure(figsize=(8,5))
+    df_results_sub = df_results[df_results['sample_size'] == sample_size]
+    for model in df_results_sub['model'].unique():
+        plt.plot(df_results_sub[df_results_sub['model'] == model]['tau']/np.log(df_results_sub[df_results_sub['model'] == model]['theta']), 
+                df_results_sub[df_results_sub['model'] == model]['time'], 'o',label=model)
+        # plt.plot(df_final_results[df_final_results['model'] == model]['sample_size'], df_final_results[df_final_results['model'] == model]['time_process'], 'o--',label=model+' (process time)')
+    plt.legend()
+    plt.xlabel('tau/log(theta)')
+    plt.ylabel('time (mins)')
+    plt.title(f'Execution times as a function of tau (m={sample_size})')
+    # plt.savefig('results/elastic-net/socp_CG_comparison_tau.pdf', format='pdf', dpi=300, bbox_inches='tight')
+    plt.show()
+
+
+# Now a heatmap of the same plot, with tau and theta in the axis. Consider that
+# the time, theta, and tau have the same length
+
+
+for sample_size in df_results['sample_size'].unique():
+    df_results_sub = df_results[df_results['sample_size'] == sample_size]
+    for model in df_results['model'].unique():
+        plt.figure(figsize=(8,5))
+        # df_sub_model = df_results_sub[df_results_sub['model'] == model]
+        # model = 'CG_SOC1_ElasticNet'
+        tau = df_results_sub[df_results_sub['model'] == model]['tau']
+        theta = np.log(df_results_sub[df_results_sub['model'] == model]['theta'])
+        time = df_results_sub[df_results_sub['model'] == model]['time']
+        plt.scatter(tau, theta, c=time, cmap='viridis', label=f'm={sample_size}')
+        plt.colorbar()
+        plt.xlabel('tau')
+        plt.ylabel('log(theta)')
+        plt.title(f'Execution times as a function of tau and theta (m={sample_size})\n {model}')
+        # plt.savefig('results/elastic-net/socp_CG_comparison_tau_theta.pdf', format='pdf', dpi=300, bbox_inches='tight')
+        plt.show()
+
+
 
 # cp.installed_solvers()
+# %%
+                    
+# # plot the three models times as a function of the sample size
+# import matplotlib.pyplot as plt
+
+# max_sample_size = 300
+# plt.figure(figsize=(8,5))
+# for model in df_final_results['model'].unique():
+#     plt.plot(df_final_results[df_final_results['model'] == model]['sample_size'], df_final_results[df_final_results['model'] == model]['time'], 'o--',label=model)
+#     # plt.plot(df_final_results[df_final_results['model'] == model]['sample_size'], df_final_results[df_final_results['model'] == model]['time_process'], 'o--',label=model+' (process time)')
+# plt.legend()
+# plt.xlabel('sample size (m)')
+# plt.ylabel('time (mins)')
+# plt.title('Execution times as a function of the sample size (m)')
+# plt.savefig('results/elastic-net/socp_scikit_comparison.pdf', format='pdf', dpi=300, bbox_inches='tight')
+# plt.show()
+
+
+
+# # %%
+
+# # Plot the scikit-learn and CG_SOC1_ElasticNet fo_value percentage difference with respect to the SOCP fo_value, for each sample size
+# plt.figure(figsize=(8,5))
+# line_styles = ['o', 'd']
+# for j,model in enumerate(['SCIKIT_ElasticNet', 'CG_SOC1_ElasticNet']):
+#     socp_fo_values = df_final_results[df_final_results['model'] == 'SOCP']['fo_value'].to_numpy()
+#     model_fo_values = df_final_results[df_final_results['model'] == model]['fo_value'].to_numpy()
+#     percentage_difference = 100 * (model_fo_values - socp_fo_values) / socp_fo_values
+#     plt.plot(df_final_results[df_final_results['model'] == model]['sample_size'], percentage_difference, 
+#              line_styles[j],label=model, markersize=6-j)
+# plt.legend()
+# plt.xlabel('sample size (m)')
+# plt.ylabel('percentage difference (%)')
+# plt.title('Percentage difference of the fo_value with respect to the SOCP fo_value')
+# plt.savefig('results/elastic-net/socp_scikit_comparison_fo_value.pdf', format='pdf', dpi=300, bbox_inches='tight')
+# plt.show()
 # %%
