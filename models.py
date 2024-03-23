@@ -2498,12 +2498,12 @@ def CG_LASSO_SOC1(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
 
         k += 1
 
-# LASSO CG with f.o. l1 instead of constraint.
+# LASSO CG with f.o. l1 instead of constraint. (Almost the same results as the previous one)
 def CG_LASSO_SOC1_v2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK, 
     solver_params={'mosek_params': {'MSK_DPAR_INTPNT_CO_TOL_REL_GAP':1e-6}}, solver_verbose=False, 
     eps_soc2_sqrt_L=0, add_constant=True, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
     solve_dual_directly=False, cg_lambda_tol=1e-6, cg_residuals_tol=1e-6,
-    v=5, v0=0, time_limit=None, dummy_condition=False, canonic_random_initial_sol=True):
+    v=5, v0=0, time_limit=None, dummy_condition=False, canonic_random_initial_sol=True, initial_solution_type="small_instance",  random_state=None):
     n,m = X.shape
     # =============================================================================
     #                            SOCP 1 Column Generation
@@ -2512,55 +2512,73 @@ def CG_LASSO_SOC1_v2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
     # =============================================================================
     #                               Algorithm
     # =============================================================================
-    
+
+    t0_cg = time()
+    t0p_cg = process_time()
+
+
+
     # # Iteration and solutions to include in each iteration
     k = 1   # itaration index
     k_v = 0 # itaration index of the multiple solutions (v_sols)
 
-    # First feasible solution (beta, z, u) with 3 * m components
-    # (**For now: beta in {0,1}^m and z = u = 1 in R^m)
-    # seed=np.random.randint(1,999999)
-    # np.random.seed(123)
+    np.random.seed(random_state)
 
     # Random initial solution
-    if not canonic_random_initial_sol:
-        rand_beta_k =    np.random.randint(-1,2, size=(m, v0)).astype(float)  
-        # Random initial solution: generate a matriz of size=(m, (v0-1)+k+(v-1)*k_v),
-        # with (v0-1)+k+(v-1)*k_v random canonic vector of R^m as columns
+    if initial_solution_type == "random":
+        beta_k =    np.random.randint(-1,2, size=(m, v0)).astype(float)  
 
-    else:
+    # Canonicla random initial solution
+    elif initial_solution_type == "random_canonical":
         # canonic random solutions
-        rand_beta_k =   np.zeros((m, v0), dtype=float)
+        beta_k =   np.zeros((m, v0), dtype=float)
         v0_positive = np.random.randint(0, v0 + 1)
-        rand_beta_k_indices_pos = np.random.choice(m, size= v0_positive, replace=False)
-        rand_beta_k_indices_neg = np.random.choice(m, size= v0 - v0_positive, replace=False)
-        rand_beta_k[rand_beta_k_indices_pos, np.arange(v0_positive)] = 1#np.random.choice([-1,1], size=(v0-1)+k+(v-1)*k_v, replace=True)
-        rand_beta_k[rand_beta_k_indices_neg, np.arange(v0_positive, v0)] = -1
+        beta_k_indices_pos = np.random.choice(m, size= v0_positive, replace=False)
+        beta_k_indices_neg = np.random.choice(m, size= v0 - v0_positive, replace=False)
+        beta_k[beta_k_indices_pos, np.arange(v0_positive)] = 1#np.random.choice([-1,1], size=(v0-1)+k+(v-1)*k_v, replace=True)
+        beta_k[beta_k_indices_neg, np.arange(v0_positive, v0)] = -1
 
-    # rand_beta_k =    np.zeros((m, (v0-1)+k+(v-1)*k_v)).astype(float) # Guardar el bicho en otra variable
-    # print('beta shape', rand_beta_k.shape)
-    # random_init_indices = np.random.choice(m, size=(v0-1)+k+(v-1)*k_v, replace=False)
-    # rand_beta_k[random_init_indices, np.arange((v0-1)+k+(v-1)*k_v)] = 1
+    elif initial_solution_type == "correlation":
+        # Correlation-based initial solution
+        beta_k = np.zeros((m, v0), dtype=float)
+        beta_k_indices = np.argsort(np.abs(np.corrcoef(X.T, y)[0,1:]))[-v0:]
+        beta_k[beta_k_indices, np.arange(v0)] = np.sign(np.corrcoef(X.T, y)[0,1:][beta_k_indices])
+
+    elif initial_solution_type == "ols":
+        # OLS initial solution. Take the v0 largest coefficients of the OLS solution
+        beta_ols = np.linalg.inv(X.T @ X) @ X.T @ y
+        beta_k = np.zeros((m, v0), dtype=float)
+        beta_k_indices = np.argpartition(np.abs(beta_ols), -v0)[-v0:]
+        beta_k[beta_k_indices, np.arange(v0)] = np.sign(beta_ols[beta_k_indices])
+
+    elif initial_solution_type == "small_instance":
+        small_rows = np.random.choice(n, size=m, replace=True) # n=m
+        small_X = X[small_rows]
+        small_y = y[small_rows]
+        small_sol = CG_LASSO_SOC1_v2(
+            small_X,small_y,tau,kappa, eps_soc2_sqrt, solver, 
+                solver_params, solver_verbose, 
+                eps_soc2_sqrt_L, add_constant, save_conv_info, sum_1_comb, pos_linear_comb,
+                solve_dual_directly, cg_lambda_tol, cg_residuals_tol,
+                v, v0, time_limit, dummy_condition, canonic_random_initial_sol,
+                initial_solution_type="canonical", random_state=random_state
+                )
+            
+        small_beta_k = small_sol[0]
+        # Get the v0 largest values of the small solution, and add them to the beta_k
+        beta_k = np.zeros((m, v0), dtype=float)
+        beta_k_indices = np.argpartition(np.abs(small_beta_k), -v0)[-v0:]
+        beta_k[beta_k_indices, np.arange(v0)] = np.sign(small_beta_k[beta_k_indices])
+
     if add_constant:
 
         # original
         constant_column = np.ones((m,1), dtype=float)
         # constant_column = np.random.choice([-1,1], size=(m,1), replace=True) #np.ones((m,1), dtype=float)
-        beta_k = np.concatenate((constant_column, rand_beta_k), axis=1)
-        # beta_k = np.concatenate((np.ones((m,1)), rand_beta_k), axis=1)
+        beta_k = np.concatenate((constant_column, beta_k), axis=1)
+        # beta_k = np.concatenate((np.ones((m,1)), beta_k), axis=1)
         v0 +=1
 
-    else :
-        beta_k = rand_beta_k
-
-    # original
-    # z_k =       np.ones((m, (v0-1)+k+(v-1)*k_v), dtype=float)
-    # u_k =       np.ones((m, (v0-1)+k+(v-1)*k_v), dtype=float)
-    # new
-    # z_k =       np.zeros((m, (v0-1)+k+(v-1)*k_v), dtype=float)
-    # u_k =       np.zeros((m, (v0-1)+k+(v-1)*k_v), dtype=float)
-    # z_k[beta_k != 0] = 1*np.sqrt(kappa/tau)
-    # u_k[beta_k != 0] = 1*np.sqrt(tau/kappa)
 
     # First vector of dual variables
     lambda_k_1 = np.array([None])
@@ -2584,9 +2602,6 @@ def CG_LASSO_SOC1_v2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
     lagrangian_p_times = []
     dual_p_times = []
     solved_duals = []
-
-    t0_cg = time()
-    t0p_cg = process_time()
 
     # Repeat until convergence
     while True:
@@ -3102,10 +3117,8 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
     else :
         beta_k = rand_beta_k
 
-    # original
-    # z_k =       np.ones((m, (v0-1)+k+(v-1)*k_v), dtype=float)
-    # u_k =       np.ones((m, (v0-1)+k+(v-1)*k_v), dtype=float)
     # new
+    z_k = np.abs(beta_k)
     # z_k =       np.zeros((m, (v0-1)+k+(v-1)*k_v), dtype=float)
     # u_k =       np.zeros((m, (v0-1)+k+(v-1)*k_v), dtype=float)
     # z_k[beta_k != 0] = 1*np.sqrt(kappa/tau)
@@ -3183,9 +3196,18 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
                 )
         ]
 
-        # 2. Cone 2: First order cone of beta: ||beta||_1 <= eta
+        # 2. Cone 2: Bound on the sum of z_i 
         soc_2 = [
-            cp.norm1(beta_k @ pi_k) <= eta_k
+            cp.sum(z_k @ pi_k) <= eta_k
+        ]
+
+        # 3. -z_i <= beta_i <= z_i
+        soc_lb = [
+            -z_k @ pi_k <= beta_k @ pi_k,
+        ]
+
+        soc_ub = [
+            beta_k @ pi_k <= z_k @ pi_k,
         ]
 
         # 3. Weights must sum 1 and be positive
@@ -3212,7 +3234,7 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
             cp.Minimize(
                 xi_k**2 + 2 * np.sqrt(tau*kappa) * eta_k
             ),
-            soc_1 + soc_2 +wei_sum
+            soc_1 + soc_2 + soc_lb + soc_ub + wei_sum
         )
 
 
@@ -3279,13 +3301,28 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
         if not solve_dual_directly:
             soc_1_k_sol = np.array([soc_1[x].dual_value for x in range(len(soc_1))], dtype=object)
 
-            print('SOC2', soc_2[0].dual_value, len(soc_2))
-            break
-
+            soc_2_k_sol = soc_2[0].dual_value
+            soc_lb_k_sol = np.array([soc_lb[x].dual_value for x in range(len(soc_1))], dtype=object)
+            soc_ub_k_sol = np.array([soc_ub[x].dual_value for x in range(len(soc_1))], dtype=object)
+            
             # If it can compute the dual variable, it will be stored in the lambda_k_1 vector
-            if soc_1_k_sol.any(): 
+            if soc_2_k_sol.any(): 
                 psi_k_sol = soc_1_k_sol[0][1]
-                mu_k_sol = soc_1_k_sol[0][0][0]
+                # mu_k_sol = soc_1_k_sol[0][0][0]
+
+                phi_k_sol = soc_2_k_sol[0]
+                gamma_k_sol_ = soc_lb_k_sol[0]
+                delta_k_sol = soc_ub_k_sol[0]
+
+                # Transformation to the infinity norm duals
+                gamma_k_sol = gamma_k_sol_ - delta_k_sol
+                gamma_0_k_sol = np.max(gamma_k_sol_ + delta_k_sol)#phi_k_sol
+                # print("gamma_k_sol", gamma_k_sol.shape)
+                # print("gamma_k_sol", gamma_k_sol)
+                # print("gamma_0_k_sol", gamma_0_k_sol)
+                # print('gamma+delta', gamma_k_sol_ + delta_k_sol)
+                # break
+
             else:
                 print("Primal-Dual gap is too big, no dual solution")
                 print("Solving dual problem... (directly)")
@@ -3301,7 +3338,7 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
 
         # Save convergence info
         if save_conv_info:
-            dual_values.append(- psi_k_sol.T @ y)
+            dual_values.append(- psi_k_sol.T @ y) # CHECK THIS
 
             # if k in solved_duals:
             #     dual_times.append(dual_time)
@@ -3312,7 +3349,8 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
         #==============================================================================
 
         # Aggregation of the dual variables in a single vector
-        lambda_k = np.append(psi_k_sol, mu_k_sol )
+        lambda_k = np.append(gamma_k_sol_, delta_k_sol)
+        lambda_k = np.append(lambda_k, phi_k_sol)
 
         # Check if lamda_k is equal to lambda_k_1. If so, stop the algorithm.
         # If not, continue the algorithm. Then, update the lambda_k_1 with the lambda_k.
@@ -3367,72 +3405,23 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
         #==============================================================================
         #                             Second Stopping Criterion
         #==============================================================================
-        # print((m, v))
-        # Check condition of |psi_k_sol.T @ X| > tau + kappa (-inf inmediately) 
-        # It's a best bound than |psi_k_sol.T @ X| > 0. Only possible because of b_i^2 <= z_i*u_i
-        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > tau + kappa).any() if not dummy_condition else False
-        # lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) > 2*np.sqrt(kappa*tau)).any() if not dummy_condition else False
-        lagrange_boundedness_conditon = (np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa*tau) > -cg_lambda_tol).any() if not dummy_condition else False
-        
-        if not lagrange_boundedness_conditon:
-            # print('condition min diff:')
-            # print(np.max(np.abs(psi_k_sol.T @ X) - 2*np.sqrt(kappa*tau)))
 
-            # =============================================================================
-            #                             Lagrangian Model
-            # =============================================================================
-            
+        boundness_condition = 2 * np.sqrt(tau*kappa) < gamma_0_k_sol if not dummy_condition else False
+        if not boundness_condition:
+
             print("-"*50)
-            print("Lagrangian Model")
+            print("Calculating the exact solution of the Lagrangian")
             print("-"*50)
 
-            # 1. Continuous unbounded
-            beta = cp.Variable(m, name="beta", nonneg=False)
-            eta = cp.Variable(1, name="eta", nonneg=True)
 
-            # =============================================================================
-            #                             Objective Function
-            # =============================================================================
-
-
-            # # 2.2 Cone 2: ||beta||_1 <= eta
-            # soc_2_L = [
-            #     cp.norm1(beta) <= eta
-            # ]
-
-            # 2. Objective function
-            L = cp.Problem(
-                cp.Minimize(
-                    0 \
-                    # + xi**2 - mu_k_sol*xi  # irrelevant for this case
-                    + (- mu_k_sol/2) * mu_k_sol/2 \
-                    + psi_k_sol.T @ X @ beta \
-                    +  2 * np.sqrt(tau*kappa) * cp.norm1(beta) \
-                    - psi_k_sol.T @ y # Constant (may be removed)
-                ),
-                # soc_2_L
-            )
-            
-            # =============================================================================
-            #                               Solver
-            # =============================================================================
-            
             t0 = time()
             t0p = process_time()
-            
-            try:
-                L.solve(
-                    verbose=solver_verbose, 
-                    solver=solver,
-                    **solver_params
-                    # Threads=10,
-                    )
-            except Exception as e:
-                # Dummy skip
-                print("Forcing skip in Lagrangian Model")
-                L = Dummy()
-                # L value equal to -inf
-                L.value = float('-inf')
+
+            # Closed form
+            beta = Dummy()
+            beta.value = np.linalg.inv(X.T @ X) @ ( gamma_k_sol / 2 + X.T @ y )
+            L = Dummy()
+            L.value = np.linalg.norm(y - X @ beta.value, 2)**2 + 0 - gamma_k_sol.T @ beta.value - 0
 
             t1 = time()
             t1p = process_time()
@@ -3444,14 +3433,13 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
                 lagrangian_p_times.append((t1p-t0p)/60)
 
             # print lagrangian times
-            print('Time elapsed in Lagrange of iteration  6')
+            print(f'Time elapsed in Lagrange of iteration {k}')
             print((t1 - t0)/60, 'mins (normal)')
             print((t1p - t0p)/60, 'mins (process)')
 
             print('-'*50)
             print("The Lagrangian optimal value is", L.value)
 
-        # Dummy skip
         else:
             print("Skipping Lagrangian Model")
             L = Dummy()
@@ -3461,7 +3449,7 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
                 lagrangian_times.append(None)
                 lagrangian_p_times.append(None)
 
-        # If it is -inffinity, then check the betas dual constraints
+            # If it is -inffinity, then check the betas dual constraints
         if L.value == float('-inf') or L.value is None:
 
             print("Lagrangian is -inffinity")
@@ -3500,8 +3488,14 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
             check_residuals = False
 
         else:
+            # Closed form
+            beta = Dummy()
+            beta.value = np.linalg.inv(X.T @ X) @ ( gamma_k_sol / 2 + X.T @ y )
+
+
+            # Solution
             beta_sol   = beta.value
-            xi_sol     = mu_k_sol/2
+        z_sol     = np.abs(beta_sol)
 
 
         # =============================================================================
@@ -3582,6 +3576,7 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
                     }
             print("Second stopping criterion NOT met: residuals**2 != 0") # , np.sqrt(residuals @ residuals)
 
+
         # ==============================================================================
         #                       Keep the loop going (updates)
         # ==============================================================================
@@ -3592,10 +3587,12 @@ def CG_LASSO_SOC2(X,y,tau,kappa, eps_soc2_sqrt=0, solver=cp.MOSEK,
         # 3.1. If beta_sol is a vector, then add it to the matrix
         if beta_sol.ndim == 1:
             beta_k = np.append(beta_k, beta_sol.reshape(m,1), axis=1)
+            z_k = np.append(z_k, z_sol.reshape(m,1), axis=1)
 
         # 3.2. If beta_sol is a matrix, then add all the columns to the matrix
         else:
             beta_k = np.append(beta_k, beta_sol, axis=1)
+            z_k = np.append(z_k, z_sol, axis=1)
 
         k += 1
 

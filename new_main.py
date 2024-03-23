@@ -56,7 +56,7 @@ from models import CG_SOC1_upgrade, SOCP, SCIKIT_ElasticNet, CG_SOC1_ElasticNet,
 if __name__ == "__main__":
     # Sample of the data
     final_results = [['model','sample_size', 'solver', 'OLS_error_quad', 'error_quad', 'fo_value','time', 'time_process', 'n_betas','status', 'tau', 'kappa', 'lambda','alpha', 'theta']]
-    for sample_size in [1000, 1500, 2000,2440]:#, 400, 500, 1000, 1500, 2000,2440]: # 100, 500, 1000,1500, 2000,  
+    for sample_size in [400, 500, 1000, 1500, 2000,2440]:#[1000, 1500, 2000,2440]:#, 400, 500, 1000, 1500, 2000,2440]: # 100, 500, 1000,1500, 2000,  
         # 500, 1000, 1500, 2000, 2440
         X = pd.read_csv('real-data-treated/usa_n3522_m2440_yr2010_filled.csv', index_col=0, header=0)
         y = pd.read_csv('real-data/s&p_n3522_yr2010.csv', index_col=0, header=0)
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         init_tau = error_quad_OLS
        
 
-        for tau_exp in [-3,-1,0,1,3]: # all previuos experiments were with tau_exp = 7
+        for tau_exp in [-3,-1,0,1,3, 5]: # all previuos experiments were with tau_exp = 7
         #     for theta_exp in [-6,-3,0,3,6]:
             theta_exp = 1
             if True:
@@ -224,25 +224,25 @@ if __name__ == "__main__":
 
 
 
-                            # # # NO USAR
-                            # # beta, xi, eta, fo_value, time, p_time_mins, cg_dict = CG_LASSO_SOC2(
-                            # #                         X, y, np.sqrt(tau*kappa), kappa, 
-                            # #                         eps_soc2_sqrt=eps_sqrt, solver=solver, 
-                            # #                         solver_params=solver_params, solver_verbose=solver_verbose,
-                            # #                         eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
-                            # #                         solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
-                            # #                         v=max(int(n*0.012), 5), v0=max(int(n*0.012), 5), time_limit=time_limit, dummy_condition=False,
-                            # #                         canonic_random_initial_sol=True
-                            # #                         )
+                            # # NO USAR
+                            # beta, xi, eta, fo_value, time, p_time_mins, cg_dict = CG_LASSO_SOC2(
+                            #                         X, y, np.sqrt(tau*kappa), kappa, 
+                            #                         eps_soc2_sqrt=eps_sqrt, solver=solver, 
+                            #                         solver_params=solver_params, solver_verbose=solver_verbose,
+                            #                         eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
+                            #                         solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
+                            #                         v=max(int(n*0.012), 5), v0=max(int(n*0.012), 5), time_limit=time_limit, dummy_condition=False,
+                            #                         canonic_random_initial_sol=True
+                            #                         )
                             
-                            # # try:
-                            # #     error_quad = np.linalg.norm(y - X @ beta) **2
-                            # # # else:
-                            # # except Exception as e:
-                            # #     error_quad = None
-                            # # # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
-                            # # final_results.append(['CG_LASSO_SOC2',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau, kappa, np.sqrt(tau*kappa),alpha, theta])
-                            # # print(error_quad)
+                            # try:
+                            #     error_quad = np.linalg.norm(y - X @ beta) **2
+                            # # else:
+                            # except Exception as e:
+                            #     error_quad = None
+                            # # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
+                            # final_results.append(['CG_LASSO_SOC2',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau, kappa, np.sqrt(tau*kappa),alpha, theta])
+                            # print(error_quad)
 
 
 
@@ -287,65 +287,68 @@ if __name__ == "__main__":
 
 
 
-                            # # CG method
-                            # beta, xi, eta, fo_value, time, p_time_mins, cg_dict = CG_LASSO_SOC1_v2(
-                            #                         X, y, np.sqrt(tau*kappa), kappa, 
-                            #                         eps_soc2_sqrt=eps_sqrt, solver=solver, 
-                            #                         solver_params=solver_params, solver_verbose=solver_verbose,
-                            #                         eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
-                            #                         solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
-                            #                         v=max(int(n*0.012), 5), v0=max(int(n*0.012), 5), time_limit=time_limit, dummy_condition=False,
-                            #                         canonic_random_initial_sol=True
-                            #                         )
-                            
-                            # try:
-                            #     error_quad = np.linalg.norm(y - X @ beta) **2
-                            # # else:
-                            # except Exception as e:
-                            #     error_quad = None
-                            # # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
-                            # final_results.append(['CG_LASSO_SOC1_v2',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau, kappa,np.sqrt(tau*kappa), alpha, theta])
-                            # print(error_quad)
-
-
-
-
-
-
-                            for alpha_ in [1e-5, 1, 1e5]:
-                            # alpha_ = 1
-                            # if True:
-
-                                tau2 = tau/alpha_ # taul_tilda / alpha
-                                kappa2 = alpha_ * tau # taul_tilda * alpha
-
-                                beta, xi, u, z, fo_value, time, p_time_mins, cg_dict = CG_SOC1_upgrade(
-                                                        X, y, tau2, kappa2, 
+                            # CG method
+                            for init_type in ['random_canonical', 'random',  'correlation', 'ols']: # 'small_instance',
+                                beta, xi, eta, fo_value, time, p_time_mins, cg_dict = CG_LASSO_SOC1_v2(
+                                                        X, y, np.sqrt(tau*kappa), kappa, 
                                                         eps_soc2_sqrt=eps_sqrt, solver=solver, 
                                                         solver_params=solver_params, solver_verbose=solver_verbose,
                                                         eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
                                                         solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
                                                         v=max(int(n*0.012), 5), v0=max(int(n*0.012), 5), time_limit=time_limit, dummy_condition=False,
-                                                        canonic_random_initial_sol=True
+                                                        canonic_random_initial_sol=True, initial_solution_type=init_type
                                                         )
+                                
                                 try:
                                     error_quad = np.linalg.norm(y - X @ beta) **2
                                 # else:
                                 except Exception as e:
                                     error_quad = None
                                 # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
-                                final_results.append(['CG_SOC1_upgrade',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau2, kappa2,np.sqrt(tau2*kappa2), alpha_, theta])
+                                # final_results.append(['CG_LASSO_SOC1_v2',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau, kappa,np.sqrt(tau*kappa), alpha, theta])
+                                final_results.append(['CG_LASSO_SOC1_v2',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, init_type, tau, kappa,np.sqrt(tau*kappa), alpha, theta])
                                 print(error_quad)
 
 
 
 
 
-                                # Error of the solution
-                                # Save final_results in a csv file
-                                df_final_results = pd.DataFrame(final_results[1:], columns=final_results[0])
-                                # df_final_results.to_csv('results/benchmark/real-data-solver-benchmark.csv', index=False)
-                                df_final_results.to_csv('results/elastic-net/socp_CG_comparison_LASSO.csv', index=False)
+
+                            # for alpha_ in [1e-4, 1e-2, 1, 1e2, 1e4]:
+                            # # alpha_ = 1
+                            # # if True:
+
+                            #     tau2 = tau/alpha_ # taul_tilda / alpha
+                            #     kappa2 = alpha_ * tau # taul_tilda * alpha
+
+                            #     beta, xi, u, z, fo_value, time, p_time_mins, cg_dict = CG_SOC1_upgrade(
+                            #                             X, y, tau2, kappa2, 
+                            #                             eps_soc2_sqrt=eps_sqrt, solver=solver, 
+                            #                             solver_params=solver_params, solver_verbose=solver_verbose,
+                            #                             eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
+                            #                             solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
+                            #                             v=max(int(n*0.012), 5), v0=max(int(n*0.012), 5), time_limit=time_limit, dummy_condition=False,
+                            #                             canonic_random_initial_sol=True
+                            #                             )
+                            #     try:
+                            #         error_quad = np.linalg.norm(y - X @ beta) **2
+                            #     # else:
+                            #     except Exception as e:
+                            #         error_quad = None
+                            #     # final_results.append([sample_size, solver, error_quad, 'optimal', (t1-t0)/60, (t1p-t0p)/60, socp.status])
+                            #     final_results.append(['CG_SOC1_upgrade',sample_size, solver, error_quad_OLS, error_quad, fo_value, time, p_time_mins, beta[beta > tol].size, 'converged', tau2, kappa2,np.sqrt(tau2*kappa2), alpha_, theta])
+                            #     print(error_quad)
+
+
+
+
+
+                            # Error of the solution
+                            # Save final_results in a csv file
+                            df_final_results = pd.DataFrame(final_results[1:], columns=final_results[0])
+                            df_final_results.to_csv('results/initial-solutions/canonical_vs_smallinstance.csv', index=False)
+                            # df_final_results.to_csv('results/benchmark/real-data-solver-benchmark.csv', index=False)
+                            # df_final_results.to_csv('results/elastic-net/socp_CG_comparison_LASSO_soc2.csv', index=False)
 
 
 # # %%
