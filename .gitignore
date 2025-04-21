@@ -1,3 +1,5 @@
 # Ignore real-data and real-data-treated folders
 real-data/
 real-data-treated/
+synthetic-data-correlated/
+synthetic-data-error/

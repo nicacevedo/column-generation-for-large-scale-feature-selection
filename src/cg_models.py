@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-#%%
+
+# Copy of "models.py", created in 21-04-2025 to continue with the research
+
 """
 Spyder Editor
 
