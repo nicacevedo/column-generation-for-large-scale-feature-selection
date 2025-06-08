@@ -12,7 +12,7 @@ from os import cpu_count
 # from models import CG_SOC1_upgrade, SOCP, SCIKIT_ElasticNet, CG_SOC1_ElasticNet, CG_LASSO_SOC1, CG_LASSO_SOC1_v2, CG_LASSO_SOC2, SCIKIT_LASSO, L_LASSO, L_LASSO_scipy
 
 #2025
-from src.cg_models import CG_LASSO_SOC1_v2, L_LASSO
+from src.cg_models import CG_LASSO_SOC1_v2
 # import mosek as MSK
 
 
@@ -23,9 +23,7 @@ if __name__ == "__main__":
         real_data = False
 
         #2025 
-        unboundedness_policy = "mixture" # ["v_solution", "unit_ball", "negative_gradient", "mixture"]
-        save_conv_info = True
-        time_limit = 1 # minutes
+        unboundedness_policy = "unit_ball"
 
         out_file = f'results/unboundedness_policy/soc1_lasso_v2_{corr_coef}_{unboundedness_policy}.csv' # 2025
         # out_file = f'results/method-benchmark/main_methods_benchmark_corr{corr_coef}_data.csv'
@@ -36,7 +34,7 @@ if __name__ == "__main__":
         # for n_row in [10000]:#[91992]: # casen
             # for m_col in [500, 1000, 1500, 2000, 2440]: # s&p 500
             # for m_col in [100, 200, 300, 400, 445]:# casen
-            for m_col in [1000]:#, 3000, 5000]:
+            for m_col in [1000]:
             # for m_col in [(2*i+1)*1000 for i in range(0,3)]:
                 # 500, 1000, 1500, 2000, 2440
 
@@ -125,7 +123,7 @@ if __name__ == "__main__":
 
 
                 # Skip that model in the loop if the last execution was more than models_time_limit
-                models_time_limit = 1 # minutes
+                models_time_limit = 15 # minutes
                 last_execution_times = {
                     'SOCP': 0,
                     'CG_LASSO_SOC1_v2': 0,
@@ -146,7 +144,7 @@ if __name__ == "__main__":
                     
 
                 # for tau_exp in np.linspace(-1.5, .1, 10): # all previuos experiments were with tau_exp = 7
-                for tau_exp in [-1]:#np.linspace(-2, -1, 2): # -1/.15 for the other synthetic
+                for tau_exp in np.linspace(-2, -1, 2): # -1/.15 for the other synthetic
 
                     print("="*100)
                     print(f'Number of rows: {n}, Number of columns: {m}, Correlation coef: {corr_coef}, Tau exp: {tau_exp}')
@@ -178,7 +176,7 @@ if __name__ == "__main__":
                             solver_verbose = False
                             solvers = ['MOSEK']  #'GUROBI', 'MOSEK', 'COPT' 'ECOS', 'ECOS_BB', 'CLARABEL', 'OSQP', 'SCS', 'CVXOPT', 
                             add_constant = False
-                            # time_limit = 0.1#60*24*7 # 7 days
+                            time_limit = 60#60*24*7 # 7 days
                             for solver in solvers:
                                 for i in range(1):
                                     # solver = solvers[-1]
@@ -242,7 +240,7 @@ if __name__ == "__main__":
                                     # df_final_results.to_csv(out_file, index=False) #'results/method-benchmark/main_methods_benchmark_real_data2.csv', index=False)
 
 
-                                    # # Direct Relaxed Lasso
+                                    # Direct Relaxed Lasso
                                     # print(solver)
                                     # beta, z, fo_value, time, p_time_mins, cg_dict = L_LASSO(X,y,tau, solver=solver, solver_params=solver_params, solver_verbose=solver_verbose)
 
@@ -356,7 +354,7 @@ if __name__ == "__main__":
                                                                 X, y, np.sqrt(tau*kappa), kappa, 
                                                                 eps_soc2_sqrt=eps_sqrt, solver=solver, 
                                                                 solver_params=solver_params, solver_verbose=solver_verbose,
-                                                                eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=save_conv_info, sum_1_comb=False, pos_linear_comb=True,
+                                                                eps_soc2_sqrt_L=eps_sqrt, add_constant=add_constant, save_conv_info=False, sum_1_comb=False, pos_linear_comb=False,
                                                                 solve_dual_directly=False, cg_lambda_tol=tol, cg_residuals_tol=tol,
                                                                 v=max(int(m*0.012), 5), v0=max(int(m*0.012), 5), time_limit=time_limit, dummy_condition=False,
                                                                 canonic_random_initial_sol=True,

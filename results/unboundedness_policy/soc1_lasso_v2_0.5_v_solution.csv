@@ -1,0 +1,2 @@
+model,n_row,m_col,solver,OLS_error_quad,error_quad,fo_value,time,time_process,k_iter,k_v_iter,n_betas,status,tau,kappa,lambda,alpha,theta,tau_exp
+CG_LASSO_SOC1_v2,10000,1000,MOSEK,4.699208925985124,4370.385163951954,8832.468512187424,0.2624354044596354,0.68046875,13,12,135,converged,4699.208925985124,4699.208925985124,4699.208925985124,1.0,4.699208925985124,-1
