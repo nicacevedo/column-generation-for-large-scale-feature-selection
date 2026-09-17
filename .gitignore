@@ -3,3 +3,11 @@ real-data/
 real-data-treated/
 synthetic-data-correlated/
 synthetic-data-error/
+
+# 2026 reassessment
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+results/2026/raw/
