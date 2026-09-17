@@ -1,7 +1,7 @@
 id: HYP-0001
 type: hypothesis
 schema_version: 1
-status: active
+status: supported
 title: Modern working-set LASSO solvers dominate the CG method everywhere
 statement: >-
   For every instance regime reachable on this host -- n and p spanning the
@@ -21,3 +21,20 @@ assumptions:
   - ASM-0001
   - ASM-0002
   - ASM-0003
+supporting_evidence:
+  - EVI-0002
+confidence: 0.9
+confidence_basis: >-
+  The frozen decision rule returns SUPPORTED on 30 of 30 preregistered cells
+  with no rejections, across all four instance families, and the
+  matched-objective secondary agrees at a median 38.7x. Held below 1.0 because
+  the comparison is single-seed per instance with no repetition, and because
+  cg_hist's tolerance ladder is inert (see EVI-0002 notes), so the certificate
+  metric measures the harness as well as the method. Neither limitation
+  plausibly closes a 38x median gap, and the matched-objective reading does not
+  depend on the ladder at all.
+revisit_if: >-
+  A working master tolerance ladder, a multi-seed rerun, or a MOSEK licence
+  changes the slowdown by more than an order of magnitude; or the method is
+  re-run under the 2025 driver configuration (pos_linear_comb=True,
+  v = v0 = max(int(m*0.012), 5)), which is not what was measured here.

@@ -202,8 +202,8 @@ other arm's moves five orders of magnitude. See §K.1.
 scales, `p` from 500 to 5000, threads pinned to one.
 
 ```text
-restricted master conic solve   76.5 % – 99.1 % of wall time
-pricing scan (forming X'psi)     0.04 % –  4.15 %
+restricted master conic solve   81.1 % – 98.8 % of wall time
+pricing scan (forming X'psi)     0.12 % –  9.42 %
 ```
 
 **The first version of this measurement said `0.00 %` and was measuring
@@ -217,13 +217,27 @@ that mattered was measured and the number the question was about was not.
 Caught here rather than by a reviewer, and corrected by measuring the product
 directly on the shapes the run uses rather than trying to intercept it.
 
+**And a second correction, from the adversarial review of the empirical case.**
+The numbers above are roughly double the ones this section carried before it.
+The profiler multiplied the cost of one `psi'X` product by the *iteration
+count*, assuming one product per iteration; the historical code performs about
+two, on at least two live paths -- the unboundedness test at
+`cg_models.py:446` and the reduced-cost scan at `:601`/`:631`. The profiler now
+counts the products instead of assuming them, in a separate untimed pass so the
+counting does not inflate what it measures (`_count_pricing_products`).
+Measured multiplier: 1.80, 1.83 and 1.98 products per iteration at lambda
+ratios 0.5, 0.1 and 0.02 -- close to two, and not exactly two, which is why it
+is counted.
+
 The conclusion survives and is now quantified rather than asserted. The pricing
-scan's share grows with `p` — 0.73 % at `p = 500`, 2.97 % at 2000, 4.15 % at
-5000 — and *shrinks* as the run lengthens, to 0.04 % on the 59-iteration
-historical case, because the master grows and it does not. Every acceleration
-the 2025 notes propose addresses a term that is at most one twenty-fourth of
-the runtime and typically far less. **`HYP-0007`'s measurable core is
-supported**, on a corrected measurement.
+scan's share peaks at **9.42 %** (`sparse`, `p = 500`, ratio 0.1) and *shrinks*
+as the run lengthens — 0.64 % on the 59-iteration historical case, 0.15 % on the
+62-iteration one, 0.12 % at ratio 0.01 — because the master grows and the
+pricing scan does not. Every acceleration the 2025 notes propose addresses a
+term worth at most about a tenth of the runtime and usually under 1 %.
+**`HYP-0007`'s measurable core is supported**, on a twice-corrected
+measurement; the earlier "at most one twenty-fourth" is withdrawn as an
+artefact of the undercount.
 
 The profile also locates the real cost: on the historical dense-truth family at
 `n = 2000, p = 1000` the per-iteration master solve grows from 17 ms to 5.4 s
@@ -275,11 +289,25 @@ trust that it did not matter.
 
 ## K. Benchmark results
 
-**PARTIAL at the time of writing: 15 of 30 preregistered cells.** The frozen
-decision rule is applied by `scripts/analyse_benchmark.py` to the *complete*
-run; nothing below is a verdict. Two families -- `correlated` and `illcond` --
-have no data at all yet, and one of them is the regime the 2023 claim is
-actually about (§B of `TIMELINE.md`).
+**COMPLETE: 30 of 30 preregistered cells, 210 arm-runs.** The frozen decision
+rule, applied by `scripts/analyse_benchmark.py` to the full run:
+
+```text
+HYP-0001  modern working-set solvers dominate the CG method everywhere
+  cells supporting  30
+  cells rejecting    0
+  cells excluded     0
+  VERDICT  SUPPORTED
+```
+
+All four families are measured, including the two -- `correlated` and
+`illcond` -- that were outstanding while the sections below were first drafted,
+and `correlated` is the regime the 2023 claim was actually made in (§B of
+`TIMELINE.md`). **It does not rescue the method.** On
+`correlated-n2000-p500-rho0.5` at ratio 0.1, LARS finishes in 0.030 s against
+`cg_hist`'s 3.78 s at an objective matched to 1.3e-13; at ratio 0.02 the same
+comparison is 0.104 s against 84.9 s. The regime that produced the historical
+claim is where the gap is widest, not narrowest.
 
 ### K.1 What the certificate says, and why it is the wrong headline
 
@@ -308,26 +336,41 @@ the certificate by a factor of six and still be optimal to eleven significant
 figures. That is exactly what happens:
 
 ```text
-instance                          ratio   cg_hist best gap   objective excess
-historical-n2000-p500             0.1     2.2e-06            +6.3e-13
-historical-n2000-p500             0.5     2.1e-06            +1.2e-12
-sparse-n2000-p500                 0.02    2.5e-06            +1.1e-14
-sparse-n2000-p500                 0.1     6.0e-06            +6.2e-11
-sparse-n2000-p500                 0.5     2.0e-06            +1.1e-11
-sparse-n2000-p5000                0.1     6.0e-05            +3.9e-10
-sparse-n2000-p5000                0.5     1.7e-06            +6.3e-12
-sparse-n500-p5000                 0.02    2.2e-05            +2.1e-11
-sparse-n500-p5000                 0.1     5.2e-06            +1.4e-12
-sparse-n500-p5000                 0.5     6.9e-06            +4.8e-11
-sparse-n10000-p1000               0.02    7.6e-06            +4.9e-11
-sparse-n10000-p1000               0.1     1.1e-05            +7.4e-11
-sparse-n10000-p1000               0.5     5.9e-05            +5.9e-10
-sparse-n2000-p5000                0.02    1.2e-01            +8.8e-04   <-- real failure
+family      instance                      ratio  cg_hist outcome    objective excess
+correlated  n2000-p500-rho0.5             0.1    3.78 s             +1.3e-13
+correlated  n2000-p500-rho0.5             0.5    gap 1.3e-06        +7.8e-12
+correlated  n2000-p500-rho0.9             0.02   gap 3.2e-06        +1.5e-11
+correlated  n2000-p500-rho0.9             0.1    0.77 s             +4.2e-13
+correlated  n2000-p500-rho0.9             0.5    0.39 s             +1.8e-11
+correlated  n2000-p500-rho0.5             0.02   gap 9.5e-06        +2.0e-12
+historical  n2000-p500                    0.1    gap 2.2e-06        +6.3e-13
+historical  n2000-p500                    0.5    gap 2.1e-06        +1.2e-12
+historical  n10000-p1000                  0.5    33.25 s            +2.7e-13
+illcond     n2000-p500-cond1e3            0.02   gap 8.6e-06        +2.2e-11
+illcond     n2000-p500-cond1e3            0.1    gap 3.8e-05        +5.2e-10
+illcond     n2000-p500-cond1e3            0.5    gap 6.1e-06        +2.4e-11
+illcond     n2000-p500-cond1e5            0.02   5.53 s             +1.3e-11
+illcond     n2000-p500-cond1e5            0.1    gap 3.0e-05        +2.5e-10
+illcond     n2000-p500-cond1e5            0.5    gap 3.7e-06        +2.5e-10
+sparse      n2000-p500                    0.02   gap 2.5e-06        +1.1e-14
+sparse      (9 further sparse cells)      ...    ...                +1e-14 .. +6e-10
+
+   -- and the four where it does not --
+historical  n2000-p500                    0.02   gap 0.24, 122.8 s  +2.3e-04
+historical  n10000-p1000                  0.1    gap 0.59, 126.4 s  +1.7e-01
+historical  n10000-p1000                  0.02   gap 0.89, 120.7 s  +9.4e-01
+sparse      n2000-p5000                   0.02   gap 0.12, 121.3 s  +8.8e-04
 ```
 
-On thirteen of fourteen cells the historical method returns an answer matching
-the best any solver found to between 1e-14 and 1e-10. It is not inaccurate. It
-is **slow**, and on one cell it genuinely fails.
+On **26 of 30** cells the historical method returns an answer matching the best
+any solver found to between 1e-14 and 1e-10, most of them while *failing* the
+1e-6 certificate. It is not inaccurate. It is **slow**.
+
+On the remaining **four** it genuinely fails, and they are not scattered: three
+are the `historical` dense-truth family at the two smaller penalties, where the
+objective ends 2.3e-04, 1.7e-01 and **9.4e-01** high after burning the full
+two-minute limit. A 94 % objective excess is not a slow solve, it is a
+non-solution.
 
 ### K.2 The supported headline
 
@@ -335,22 +378,35 @@ Comparing time to a *matched objective* of 1e-6 -- the same shape of rule, with
 the answer in place of the certificate, recorded as post-hoc in `DEC-0001` and
 reported beside the frozen rule, never instead of it:
 
-> On the 13 comparable cells measured so far, `cg_hist` is **7.9x to 4530x
-> slower than the best modern solver at a matched objective, median 25.9x.**
+> On the 26 comparable cells, `cg_hist` is **7.9x to 4530x slower than the
+> best modern solver at a matched objective, median 38.7x.**
 
 | cell | slowdown | `cg_hist` |
 |---|---|---|
 | `historical-n2000-p500` r=0.1 | **4530x** | 68.35 s |
 | `sparse-n500-p5000` r=0.02 | 833x | 75.98 s |
+| `correlated-n2000-p500-rho0.5` r=0.02 | 818x | 84.92 s |
 | `sparse-n2000-p500` r=0.02 | 628x | 6.33 s |
+| `historical-n10000-p1000` r=0.5 | 269x | 33.25 s |
+| `illcond-n2000-p500-cond1e5` r=0.02 | 157x | 5.53 s |
+| `correlated-n2000-p500-rho0.5` r=0.1 | 154x | 3.78 s |
+| `illcond-n2000-p500-cond1e3` r=0.02 | 153x | 4.47 s |
+| `illcond-n2000-p500-cond1e3` r=0.1 | 115x | 1.38 s |
 | `historical-n2000-p500` r=0.5 | 104x | 0.97 s |
+| `illcond-n2000-p500-cond1e5` r=0.1 | 67x | 1.14 s |
 | `sparse-n500-p5000` r=0.1 | 48x | 1.58 s |
+| `correlated-n2000-p500-rho0.5` r=0.5 | 41x | 0.42 s |
 | `sparse-n2000-p500` r=0.1 | 37x | 0.37 s |
+| `correlated-n2000-p500-rho0.9` r=0.02 | 33x | 0.90 s |
+| `correlated-n2000-p500-rho0.9` r=0.1 | 32x | 0.77 s |
+| `correlated-n2000-p500-rho0.9` r=0.5 | 28x | 0.39 s |
 | `sparse-n10000-p1000` r=0.02 | 26x | 2.77 s |
 | `sparse-n2000-p500` r=0.5 | 23x | 0.25 s |
+| `illcond-n2000-p500-cond1e3` r=0.5 | 22x | 0.21 s |
 | `sparse-n10000-p1000` r=0.5 | 22x | 2.06 s |
 | `sparse-n500-p5000` r=0.5 | 18x | 0.51 s |
 | `sparse-n10000-p1000` r=0.1 | 17x | 2.02 s |
+| `illcond-n2000-p500-cond1e5` r=0.5 | 12x | 0.14 s |
 | `sparse-n2000-p5000` r=0.1 | 8.7x | 0.82 s |
 | `sparse-n2000-p5000` r=0.5 | 7.9x | 0.72 s |
 
@@ -360,13 +416,16 @@ objective is already optimal at the loosest tolerance -- a working ladder could
 only change how long the certificate takes, not the answer that is already
 there.
 
-The two `historical`-family cells are the first data in the regime the 2023
-claim was made in, and they are the *worst* cells for the method, not the best.
-That is the opposite of what §B of `TIMELINE.md` records for the 2023-vs-2023
-comparison, where the method was 2.4x **faster** than its contemporary
-baseline at a matched objective. The difference is not the regime; it is
-sixteen years of working-set solvers. `correlated` and `illcond` remain
-unmeasured and could still move this.
+No family escapes. The slowest cells are `historical` and `correlated` -- the
+two regimes the 2023 work was actually about -- and the fastest relative
+showing, 7.9x, is on `sparse` `p = 5000`, a regime the historical work never
+tested. That is the opposite of what §B of `TIMELINE.md` records for the
+2023-vs-2023 comparison, where the method was 2.4x **faster** than its
+contemporary baseline at a matched objective in exactly this correlated regime.
+
+The difference is not the regime and not the instance. It is sixteen years of
+working-set solvers: the 2023 baseline was scikit-learn's cyclic coordinate
+descent, and the arms that beat the method here are `celer`, `skglm` and LARS.
 
 ### K.3 The shape of the cost
 
@@ -402,6 +461,33 @@ Corrected after review; both were reporting errors of mine, not measurements.
   small penalty it fires every iteration and no bound is ever computed, at a
   large one it need not. This weakens `HYP-0006`'s stated *mechanism* -- that
   the test always fires -- without settling its termination claim.
+
+### K.5 Seven runs where the master did not solve at all
+
+Recorded because a benchmark that reports only the cells that finished is not
+reporting the method. Across the 210 arm-runs, `cg_hist` ended
+`error:SolverError` 7 times, `time_limit` 12 times, and `ok` 71 times. Every
+one of the seven is at the **tightest** requested tolerance, `tol = 1e-8`:
+
+```text
+correlated-n2000-p500-rho0.5  r=0.02, r=0.1
+correlated-n2000-p500-rho0.9  r=0.02, r=0.1
+historical-n10000-p1000       r=0.5
+illcond-n2000-p500-cond1e3    r=0.5
+illcond-n2000-p500-cond1e5    r=0.5
+```
+
+Clarabel raises rather than returning an inaccurate answer, and the restricted
+master is where it raises. Not one is in the `sparse` family. This is the
+numerical instability §L inherits from the historical material -- infeasible
+masters, `singular KKT matrix`, solver status `Numerical` -- reproducing on
+new instances with a different solver, which is stronger evidence that it is a
+property of the *formulation* than anything in the 2023 record.
+
+It also caps what the tolerance ladder could ever have delivered for this arm
+(§K.1): the one setting that asks the master for more accuracy is the one that
+makes it fail.
+
 
 ## L. Numerical-stability results
 
@@ -498,7 +584,7 @@ measured.
 
 | object | status |
 |---|---|
-| `HYP-0001` modern solvers dominate | supported on 15/30 cells; awaiting the full run |
+| `HYP-0001` modern solvers dominate | **SUPPORTED on 30/30 cells** by the frozen rule; 7.9x-4530x slower at a matched objective, median 38.7x |
 | `HYP-0002` bounded pricing ≡ dual feasibility | supported, derived and certified on 30 visited duals |
 | `HYP-0003` it is a maximum-violation working-set method | supported by source reading; the trajectory trace the proposal asks for is not run |
 | `HYP-0004` unit-ball value is not a lower bound | first clause proved; existence clause supported on unstandardised data, not observed on standardised |
@@ -528,14 +614,21 @@ recommendation is unchanged and its evidential basis is stronger, because
 "7.9x to 4530x slower at a matched objective" does not depend on the duality-gap
 certificate whose ladder §K.1 shows to be inert for this arm.
 
-**What would change this recommendation, and is not yet measured.** Half the
-preregistered cells are outstanding, and two entire families -- `correlated`
-and `illcond` -- have no data. `correlated` is the regime the 2023 claim was
-actually made in, and §B of `TIMELINE.md` records the method beating its
-contemporary baseline there by 2.4x at a matched objective. The two
-`historical`-family cells that have arrived point the other way, hard (4530x
-and 104x), which is why this is a recommendation and not yet a decision. A
-`REJECTS` verdict on the full run would reopen it.
+**The run is now complete and it did not reopen this.** All 30 preregistered
+cells have data; the frozen rule returns `SUPPORTED` on 30 of 30 with no
+rejections and no exclusions. The two families that were outstanding when this
+section was first drafted -- `correlated` and `illcond` -- came in against the
+method, and `correlated` is the regime the 2023 claim was actually made in.
+§B of `TIMELINE.md` records the method beating its *contemporary* baseline
+there by 2.4x at a matched objective; against 2026 working-set solvers in the
+same regime it is 28x to 818x slower. Sixteen years of solver development, not
+a change of problem.
+
+Two further complete-run facts point the same way: four cells where the
+objective ends between 2.3e-04 and **9.4e-01** high after exhausting the time
+limit, and seven runs where the restricted master raised outright rather than
+returning an answer (§K.5), every one at the tightest tolerance and none in
+the `sparse` family.
 
 **This recommendation is not the decision.** Under the capsule's own rules a
 Claim is accepted by a human, and none has been; §O records that no Claim

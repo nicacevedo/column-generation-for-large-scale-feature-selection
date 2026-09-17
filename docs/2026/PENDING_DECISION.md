@@ -73,6 +73,27 @@ falsify `HYP-0003` and reopen the novelty question this reassessment closed.
 None of that is a recommendation about how to decide. It is what you should
 know before you do.
 
+## What has changed since this file was written
+
+`EXP-0001` has since completed all 30 preregistered cells and the frozen
+decision rule returns **SUPPORTED on 30/30** for `HYP-0001` (`EVI-0002`). That
+does not decide the proposal, and it does not touch PR-006 -- the
+round-by-round working-set equivalence trace is still the one outstanding
+experiment that could falsify `HYP-0003` and reopen the novelty question.
+
+If anything the completed run raises PR-006's value. The benchmark establishes
+that the method is slow; it does not establish *that it is the known rule*, and
+`HYP-0003` currently rests on source reading alone (§O of
+`SCIENTIFIC_REPORT.md`). The no-paper recommendation in §P leans on both legs
+independently, so PR-006 is the cheapest way to test the leg that has not been
+measured.
+
+An adversarial review of the empirical case also landed, and several of its
+findings changed what the benchmark is taken to show -- the headline is now a
+matched-objective slowdown rather than a failure to reach accuracy. §K.1 and
+§K.4 of `SCIENTIFIC_REPORT.md` list every retraction. None of it bears on
+whether to promote or decline any item here.
+
 ## What follows either way
 
 Research OS observes the capsule, emits one deduplicated `CAPSULE_CHANGED`

@@ -174,6 +174,7 @@ def main() -> int:
     excluded: list[str] = []
     sklearn_ok = sklearn_total = 0
     lagrangian_nonzero: list[str] = []
+    solver_failures: list[str] = []
     cg_status: dict[str, int] = defaultdict(int)
 
     matched: list[tuple[str, float, float]] = []
@@ -205,8 +206,14 @@ def main() -> int:
             cg_wall, _ = time_to_target(cg_row["records"])
             for record in cg_row["records"]:
                 cg_status[record.get("status", "?")] += 1
-                detail = record.get("detail") or {}
-                if detail.get("lagrangian_values_recorded"):
+                detail = record.get("detail")
+                if isinstance(detail, str):
+                    # `solve_cg_hist` records a crash as its detail rather than
+                    # letting it abort the cell. A failed master solve is a
+                    # measurement of the method, so it is counted, not skipped.
+                    solver_failures.append(f"{label} r={ratio} tol={record['tol']:g}")
+                    continue
+                if (detail or {}).get("lagrangian_values_recorded"):
                     lagrangian_nonzero.append(f"{label} r={ratio}")
         elif cg_row:
             cg_status[cg_row.get("status", "?")] += 1
@@ -307,6 +314,11 @@ def main() -> int:
     # instances, which cannot confirm or deny anything about them. HYP-0005 was
     # settled separately, and rejected, by reading the committed 2023 CSVs
     # (EVI-0001): two of its three configurations stopped below max_iter.
+    print("OBSERVATION  cells where cg_hist's restricted master failed outright")
+    print(f"  runs whose conic solve raised: {len(solver_failures)}")
+    for item in solver_failures:
+        print(f"    {item}")
+    print()
     print("OBSERVATION  does current scikit-learn converge on these instances")
     print(
         f"  cells reaching gap < 1e-8 without hitting max_iter: "

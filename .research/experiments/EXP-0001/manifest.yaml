@@ -1,7 +1,7 @@
 id: EXP-0001
 type: experiment
 schema_version: 1
-status: specified
+status: completed
 title: Does the historical CG speed regime survive modern LASSO solvers?
 purpose: >-
   The first falsification question. The 2023 poster claims the decomposition
@@ -152,3 +152,13 @@ notes: >-
   (ASM-0002). A result showing the modern solvers faster everywhere here does
   not establish that no implementation of this method could be competitive; it
   establishes that this one is not, which is what HYP-0001 says.
+provenance:
+  code: src/cg2026
+  config: experiments/EXP-0001-plan.json
+  data: >-
+    generated in-process by src/cg2026/data.py::build from the InstanceSpec
+    records in experiments/EXP-0001-plan.json; no external dataset
+  git_commit: 0275e54
+result_manifest: results/2026/EXP-0001.manifest.json
+artifacts:
+  - results/2026/EXP-0001.jsonl

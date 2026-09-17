@@ -1,0 +1,20 @@
+{
+  "environment": {
+    "celer": "0.7.4",
+    "clarabel": "0.11.1",
+    "cvxpy": "1.9.2",
+    "git_commit": "0275e548a0d05093ca46beebbbabb5bd9779af04",
+    "git_dirty": "False",
+    "numpy": "2.5.3",
+    "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+    "python": "3.12.14",
+    "scipy": "1.18.1",
+    "skglm": "0.5",
+    "sklearn": "1.9.1",
+    "threads": "{\"MKL_NUM_THREADS\": \"1\", \"NUMEXPR_NUM_THREADS\": \"1\", \"OMP_NUM_THREADS\": \"1\", \"OPENBLAS_NUM_THREADS\": \"1\", \"RAYON_NUM_THREADS\": \"1\", \"VECLIB_MAXIMUM_THREADS\": \"1\"}"
+  },
+  "plan_digest": "8e42f3ecd71f4aaf34784283773b70ce4c3fa7f62f2fd58c83908919c054f141",
+  "plan_file_sha256": "2c18b7c9c4fc7921bec1e74d982a52a5c7c01d1f2b8c2c547583381144b46a1a",
+  "plan_path": "experiments/EXP-0001-plan.json",
+  "results": "results/2026/EXP-0001.jsonl"
+}

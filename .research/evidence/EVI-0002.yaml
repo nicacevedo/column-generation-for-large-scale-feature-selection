@@ -1,0 +1,47 @@
+id: EVI-0002
+type: evidence
+schema_version: 1
+status: active
+title: EXP-0001 complete run, 30 of 30 preregistered cells
+kind: experiment
+experiment: EXP-0001
+locator: >-
+  results/2026/EXP-0001.jsonl
+  (sha256 e55d1f6637ed38da0ab05814d3fb39960aa6c595211eafccbbe0d39dcda0f334,
+  210 arm-runs); results/2026/EXP-0001.manifest.json
+statement: >-
+  EXP-0001 completed all 30 preregistered cells across four instance families
+  (sparse, historical, correlated, illcond) at three lambda ratios, executed by
+  Research OS in a worktree pinned at commit 0275e54, the commit that froze the
+  design before any comparative number existed.
+
+  Applying the frozen decision rule in scripts/analyse_benchmark.py: 30 cells
+  support HYP-0001, 0 reject, 0 excluded.
+
+  Secondary and explicitly post-hoc (DEC-0001), time to a matched objective of
+  1e-6 on the 26 comparable cells: cg_hist is between 7.9x and 4530x slower
+  than the best modern arm, median 38.7x. On 26 of 30 cells cg_hist's objective
+  matches the best any arm reached to between 1e-14 and 1e-10 while failing the
+  1e-6 duality-gap certificate; on 4 it fails outright, with objective excesses
+  of 2.3e-04, 8.8e-04, 1.7e-01 and 9.4e-01 after exhausting the time limit.
+
+  Run statuses for cg_hist across 210 arm-runs: 71 ok, 12 time_limit, 7
+  error:SolverError. All seven solver failures are at the tightest requested
+  tolerance (1e-8) and none is in the sparse family.
+
+  The correlated family, the regime the 2023 speed claim was made in, does not
+  favour the method: 28x to 818x slower at a matched objective.
+notes: >-
+  This records what the run produced. It is not a Claim and no Claim has been
+  accepted; per the capsule's own rules that is a human act. Reproduce with
+  scripts/analyse_benchmark.py results/2026/EXP-0001.jsonl.
+
+  Two caveats belong with the numbers and are documented in
+  docs/2026/SCIENTIFIC_REPORT.md sections J.1 and K.1. First, the run predates
+  the SUPPORT_RTOL repair, so the nnz and kkt columns in the JSONL follow the
+  older exact-zero rule and are not the quantities the current objective module
+  defines; neither enters the decision rule. Second, cg_hist's tolerance ladder
+  is largely inert because the adapter passes solver_params={}, leaving the
+  restricted master at Clarabel's default accuracy, so the certificate metric
+  understates what the method could certify with a working ladder. The
+  matched-objective comparison is unaffected.
