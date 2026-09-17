@@ -1,0 +1,11 @@
+id: Q-0007
+type: question
+schema_version: 1
+status: open
+title: What caused the historical numerical instability?
+statement: >-
+  The historical material records infeasible master problems, singular KKT
+  matrices, solver terminations with status 'Numerical', and deterioration as
+  the master's support grows. What is the mechanism, and which of
+  standardisation, scaling, initial working set, warm starts, master
+  formulation and solver version actually addresses it?

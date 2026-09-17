@@ -1,0 +1,10 @@
+id: Q-0010
+type: question
+schema_version: 1
+status: open
+title: Does any perspective l0 + l2 direction remain novel?
+statement: >-
+  The historical whiteboard derives the perspective / rank-one convexification
+  of the l0 + l2 set. That derivation is standard in the modern literature.
+  Does anything in this project's l0 + l2 material remain novel after the
+  perspective and rank-one convexification work of the last decade?

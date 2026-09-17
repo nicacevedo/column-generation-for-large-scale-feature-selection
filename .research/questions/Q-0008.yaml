@@ -1,0 +1,10 @@
+id: Q-0008
+type: question
+schema_version: 1
+status: open
+title: Is support-size rather than dimension scaling defensible?
+statement: >-
+  The poster claims execution time depends on the number of selected features
+  and not on instance size. Is that behaviour theoretically defensible for
+  this method, or is it an empirical observation over a finite and narrow
+  range of instances?

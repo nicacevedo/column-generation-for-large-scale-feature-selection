@@ -1,0 +1,19 @@
+id: HYP-0002
+type: hypothesis
+schema_version: 1
+status: active
+title: Bounded pricing is exactly full LASSO dual feasibility
+statement: >-
+  Under the model's scaling convention, the pricing subproblem at a master
+  dual psi has a finite infimum if and only if ||X' psi||_inf <= lambda_1,
+  which is exactly the feasibility constraint of the dual of the full LASSO;
+  and when it is finite the infimum is zero.
+falsification: >-
+  Exhibit a psi with ||X' psi||_inf > lambda_1 at which the pricing infimum is
+  finite, or a psi with ||X' psi||_inf <= lambda_1 at which it is minus
+  infinity, or a finite infimum that is non-zero.
+addresses:
+  - Q-0002
+  - Q-0003
+assumptions:
+  - ASM-0001

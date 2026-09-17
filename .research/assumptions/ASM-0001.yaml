@@ -1,0 +1,11 @@
+id: ASM-0001
+type: assumption
+schema_version: 1
+status: active
+title: The objective convention is squared residual plus l1
+statement: >-
+  Every statement in this project uses min ||y - X beta||_2^2 + lambda_1
+  ||beta||_1 (+ lambda_2 ||beta||_2^2 where stated), with no 1/n and no 1/2.
+  Conversions to any solver's own scaling are explicit and unit-tested.
+scope: >-
+  every comparison, derivation and reported objective value in this project

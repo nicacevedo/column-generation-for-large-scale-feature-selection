@@ -1,0 +1,15 @@
+id: Q-0001
+type: question
+schema_version: 1
+status: open
+title: Does the historical CG speed regime survive modern solvers?
+statement: >-
+  The 2023 poster claims the decomposition method is fastest when between
+  roughly 75 features and 40 % of the feature count are non-zero, measured
+  against scikit-learn coordinate descent and monolithic conic solves. Modern
+  working-set and screening solvers (Celer, skglm, current glmnet-class
+  coordinate descent) post-date that comparison and are built for exactly the
+  regime it reports. Under matched objective scaling, matched optimality
+  tolerance, controlled threading and repeated runs, is there any instance
+  regime in which the column-generation method is faster than the best
+  available LASSO solver?

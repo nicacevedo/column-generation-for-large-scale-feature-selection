@@ -1,0 +1,10 @@
+id: Q-0003
+type: question
+schema_version: 1
+status: open
+title: Do the violating coordinates identify the missing columns?
+statement: >-
+  Do the coordinates satisfying |(psi'X)_i| > lambda_1 identify exactly the
+  information missing from the restricted master, in the sense that the
+  restricted master is optimal for the full problem if and only if that set is
+  empty?

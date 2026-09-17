@@ -1,0 +1,11 @@
+id: Q-0005
+type: question
+schema_version: 1
+status: open
+title: Can the true Elastic-Net pricing be derived exactly and used?
+statement: >-
+  With a lambda_2 ||beta||_2^2 term the coordinate pricing problem is strongly
+  convex and has a closed form. Can that form be derived exactly under the
+  model's own scaling convention, and does using it produce a usable conic
+  column-generation method for the Elastic Net -- as distinct from the l0 + l2
+  perspective formulation that the historical notes also call 'Elastic Net'?

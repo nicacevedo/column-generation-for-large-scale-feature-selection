@@ -1,0 +1,12 @@
+id: ASM-0002
+type: assumption
+schema_version: 1
+status: active
+title: MOSEK is unavailable, so no timing here reproduces a historical timing
+statement: >-
+  The historical results were produced with MOSEK, which is not licensed on
+  this host. Conic solves here use Clarabel. Any comparison against a
+  historical number is a comparison across solvers and is labelled an
+  independent reimplementation.
+scope: >-
+  every reproduction attempt and every conic timing

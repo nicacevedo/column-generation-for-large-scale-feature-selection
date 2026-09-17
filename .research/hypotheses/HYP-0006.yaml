@@ -1,0 +1,18 @@
+id: HYP-0006
+type: hypothesis
+schema_version: 1
+status: active
+title: Termination is not certified by the pricing bound
+statement: >-
+  The implemented method stops on a dual-stall heuristic rather than on a
+  pricing optimality certificate, because its boundedness test treats the KKT
+  equality |a_i| = lambda_1 -- which holds exactly on the support at
+  optimality -- as unboundedness.
+falsification: >-
+  Exhibit a run that terminates through the pricing test rather than through
+  the dual-stall or no-new-column criteria, under the default tolerance.
+addresses:
+  - Q-0002
+  - Q-0007
+assumptions:
+  - ASM-0001

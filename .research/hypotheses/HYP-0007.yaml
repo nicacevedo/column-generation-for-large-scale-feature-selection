@@ -1,0 +1,18 @@
+id: HYP-0007
+type: hypothesis
+schema_version: 1
+status: active
+title: The pricing scan is not the bottleneck
+statement: >-
+  In the implemented method the per-iteration cost is dominated by the
+  restricted master conic solve rather than by forming X' psi, so approximate,
+  stochastic or GPU matrix-vector machinery would address the wrong term.
+falsification: >-
+  Profile the method and find X' psi accounting for a larger share of per-
+  iteration wall time than the master solve, in any preregistered instance
+  regime.
+addresses:
+  - Q-0001
+  - Q-0007
+assumptions:
+  - ASM-0003

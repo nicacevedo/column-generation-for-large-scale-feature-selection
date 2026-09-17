@@ -1,0 +1,12 @@
+id: Q-0002
+type: question
+schema_version: 1
+status: open
+title: Is pricing boundedness exactly full LASSO dual feasibility?
+statement: >-
+  The pricing subproblem min_beta psi'X beta + lambda_1 ||beta||_1 is
+  unbounded precisely when some |(psi'X)_i| exceeds lambda_1. The full LASSO
+  dual constrains ||X' psi||_inf <= lambda_1. Are these the same condition,
+  exactly and in both directions, under one fixed sign and scaling convention
+  -- and if so, what follows for the historical observation that the pricing
+  becomes bounded only close to termination?

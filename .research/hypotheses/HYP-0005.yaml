@@ -1,0 +1,19 @@
+id: HYP-0005
+type: hypothesis
+schema_version: 1
+status: active
+title: The historical baseline did not converge
+statement: >-
+  The scikit-learn coordinate-descent baseline underlying the historical speed
+  claim did not reach its stopping tolerance on the instances that produce the
+  claim: its recorded iteration counts reach and equal max_iter, and the
+  regime is a near-zero penalty with a near-dense solution.
+falsification: >-
+  Re-run the historical configuration and obtain converged baseline solutions,
+  at the recorded iteration counts, whose wall times reproduce the historical
+  figures.
+addresses:
+  - Q-0001
+assumptions:
+  - ASM-0001
+  - ASM-0002

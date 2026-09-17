@@ -1,0 +1,11 @@
+id: ASM-0003
+type: assumption
+schema_version: 1
+status: active
+title: Timings are single-host and thread-controlled
+statement: >-
+  All timings are produced on one machine with the thread count fixed and
+  recorded. No claim is made about behaviour on other hardware, and no claim
+  is made about asymptotic scaling from a finite set of instance sizes.
+scope: >-
+  every computational result

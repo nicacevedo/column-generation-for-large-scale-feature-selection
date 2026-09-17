@@ -1,0 +1,23 @@
+id: HYP-0001
+type: hypothesis
+schema_version: 1
+status: active
+title: Modern working-set LASSO solvers dominate the CG method everywhere
+statement: >-
+  For every instance regime reachable on this host -- n and p spanning the
+  historical range and beyond, correlated and ill-conditioned designs included
+  -- at matched objective and matched optimality tolerance, the best of Celer,
+  skglm and current scikit-learn reaches the tolerance in less wall time than
+  the conic column-generation method.
+falsification: >-
+  Exhibit one preregistered instance regime, with threads controlled and at
+  least five repetitions, in which the column-generation method's median wall
+  time to a matched KKT tolerance is lower than every modern baseline's.
+addresses:
+  - Q-0001
+  - Q-0008
+  - Q-0009
+assumptions:
+  - ASM-0001
+  - ASM-0002
+  - ASM-0003

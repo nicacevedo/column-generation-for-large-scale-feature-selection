@@ -1,0 +1,9 @@
+id: Q-0009
+type: question
+schema_version: 1
+status: open
+title: Does the method remain useful on modern heterogeneous real data?
+statement: >-
+  The historical real-data experiment is one financial panel. Does the method
+  behave competitively on the benchmark datasets the modern sparse-regression
+  literature uses, including high-dimensional and ill-conditioned ones?

@@ -1,0 +1,12 @@
+id: ASM-0004
+type: assumption
+schema_version: 1
+status: active
+title: The 2025 notes' self-reported dates are uncorroborated
+statement: >-
+  Both April 2025 documents were printed to PDF on 2026-09-17 and carry no
+  independent evidence of when their content was written. The ordering of the
+  2025 work relative to the whiteboard is inferred from content and from the
+  Git history, not from document metadata.
+scope: >-
+  the 2023-2025 timeline and any statement about who knew what when

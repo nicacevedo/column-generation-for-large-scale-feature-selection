@@ -1,0 +1,22 @@
+id: HYP-0003
+type: hypothesis
+schema_version: 1
+status: active
+title: Top-violation column generation is a maximum-violation working-set method
+statement: >-
+  With unrestricted master weights and signed-unit-vector columns, the
+  restricted master's reachable set is the span of the selected coordinates,
+  so the method is the LASSO restricted to a coordinate working set, and
+  selecting the v largest |(X' psi)_i| is the maximum-violation rule. It is
+  therefore not a new column-generation scheme but a conic-solver
+  implementation of a known working-set method.
+falsification: >-
+  Exhibit a generated column that is not a signed unit vector under the
+  default configuration, or a reachable master solution whose support is not
+  contained in the selected coordinate set, or a published working-set method
+  whose selection rule this provably differs from.
+addresses:
+  - Q-0003
+  - Q-0004
+assumptions:
+  - ASM-0001

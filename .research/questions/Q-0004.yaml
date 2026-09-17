@@ -1,0 +1,12 @@
+id: Q-0004
+type: question
+schema_version: 1
+status: open
+title: Is top-violation selection a known working-set rule?
+statement: >-
+  Selecting the v coordinates of largest v_i = (|(psi'X)_i| - lambda_1)_+ is
+  the historical pricing rule. Is it the exact pricing rule for this
+  decomposition, a restatement of the maximum-violation working-set rule used
+  by active-set LASSO solvers since Osborne, Presnell and Turlach, a special
+  case of it, a generalisation, or genuinely distinct? This is the primary
+  novelty gate for the computational track.

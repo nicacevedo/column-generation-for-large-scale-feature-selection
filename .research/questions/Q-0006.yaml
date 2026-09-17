@@ -1,0 +1,11 @@
+id: Q-0006
+type: question
+schema_version: 1
+status: open
+title: Can lambda_2 > 0 act as a principled stabilisation toward LASSO?
+statement: >-
+  If lambda_2 > 0 makes the pricing finite and strongly convex, a continuation
+  that decreases lambda_2 toward zero would give a sequence of well-posed
+  pricing problems approaching the LASSO. Is that scheme principled, does it
+  help, and is it distinguishable from the existing column-generation
+  stabilisation literature?

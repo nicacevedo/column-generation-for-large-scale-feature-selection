@@ -1,0 +1,18 @@
+id: HYP-0004
+type: hypothesis
+schema_version: 1
+status: active
+title: The unit-ball pricing value is not a valid lower bound
+statement: >-
+  Restricting the pricing problem to ||beta||_2 <= 1 raises the infimum of a
+  minimisation, so the resulting value is an upper bound on the Lagrangian
+  dual function and not a lower bound on the primal optimum. There exist
+  reachable dual points at which it exceeds the primal optimum.
+falsification: >-
+  Prove that the unit-ball pricing value is always at most the primal optimum,
+  for every dual point the algorithm can reach; or show that the primal
+  supplies a matching bound on ||beta||_2 that makes the restriction valid.
+addresses:
+  - Q-0002
+assumptions:
+  - ASM-0001
