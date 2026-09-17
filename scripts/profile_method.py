@@ -65,6 +65,7 @@ def main() -> int:
             "shares": profile.shares(),
             "master_solve_seconds": profile.master_solve,
             "pricing_scan_seconds": profile.pricing_scan,
+            "pricing_scan_ms_per_iteration": profile.pricing_scan_per_iteration * 1000,
             "first_master_ms": profile.per_call[0] * 1000 if profile.per_call else None,
             "last_master_ms": profile.per_call[-1] * 1000 if profile.per_call else None,
         }

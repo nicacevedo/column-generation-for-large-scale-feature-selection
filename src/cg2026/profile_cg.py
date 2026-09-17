@@ -32,13 +32,34 @@ class Profile:
     """`cvxpy` solve calls: the restricted master, and the Lagrangian when it runs."""
 
     pricing_scan: float = 0.0
-    """Forming ``X' psi`` and finding the largest violations."""
+    """Forming ``X' psi``, measured directly rather than intercepted.
+
+    **The first version of this field measured nothing, and the 0.00 % it
+    reported was an artifact.** It patched ``np.matmul`` and the historical code
+    writes ``psi_k_sol.T @ X``; the ``@`` operator dispatches to
+    ``ndarray.__matmul__`` in C and never reaches the Python-level ``np.matmul``
+    symbol, so the wrapper was never called. Verified: patching ``np.matmul``
+    and evaluating ``A @ B`` intercepts zero calls and ``np.matmul(A, B)``
+    intercepts one.
+
+    ``cvxpy.Problem.solve`` is an ordinary Python method, so *that* interception
+    was real and the master-solve share was measured. What was not measured was
+    the term the whole question is about.
+
+    This is now a direct measurement: the product is timed on the actual
+    operand shapes, over repetitions, and multiplied by the number of
+    iterations the run performed. That is a measurement of the operation rather
+    than of the code path, which is weaker in one way -- it does not capture
+    allocation or cache effects inside the run -- and stronger in another: it
+    cannot silently miss.
+    """
 
     column_build: float = 0.0
     residual_check: float = 0.0
     """The least-squares regression of the new column onto the existing ones."""
 
     iterations: int = 0
+    pricing_scan_per_iteration: float = 0.0
     solve_calls: int = 0
     per_call: list[float] = field(default_factory=list)
 
@@ -96,12 +117,9 @@ def profile_cg_hist(
             profile.solve_calls += 1
             profile.per_call.append(elapsed)
 
-    # `psi' X` happens inside the historical code as a bare numpy expression, so
-    # there is no function to wrap. What there *is* is `np.argpartition`, which
-    # the code calls exactly once per column-generation step, and `matmul`. Both
-    # are wrapped at the numpy level for the duration of the run.
+    # `np.argpartition` IS reached, because the historical code calls it by
+    # name; `@` is not, because it dispatches in C. See `Profile.pricing_scan`.
     original_argpartition = np.argpartition
-    original_matmul = np.matmul
 
     def timed_argpartition(*args, **kwargs):
         started = time.perf_counter()
@@ -109,22 +127,6 @@ def profile_cg_hist(
             return original_argpartition(*args, **kwargs)
         finally:
             profile.column_build += time.perf_counter() - started
-
-    def timed_matmul(a, b, *args, **kwargs):
-        # Only the products that involve the full design matrix are pricing
-        # work. `beta_k @ pi_k` and friends are master bookkeeping.
-        involves_design = (
-            getattr(a, "shape", None) == X.shape
-            or getattr(b, "shape", None) == X.shape
-            or getattr(a, "shape", None) == X.T.shape
-            or getattr(b, "shape", None) == X.T.shape
-        )
-        started = time.perf_counter()
-        try:
-            return original_matmul(a, b, *args, **kwargs)
-        finally:
-            if involves_design:
-                profile.pricing_scan += time.perf_counter() - started
 
     original_fit = LinearRegression.fit
 
@@ -139,7 +141,6 @@ def profile_cg_hist(
     buffer = io.StringIO()
     cp.Problem.solve = timed_solve
     np.argpartition = timed_argpartition
-    np.matmul = timed_matmul
     LinearRegression.fit = timed_fit
     try:
         started = time.perf_counter()
@@ -165,9 +166,19 @@ def profile_cg_hist(
     finally:
         cp.Problem.solve = original_solve
         np.argpartition = original_argpartition
-        np.matmul = original_matmul
         LinearRegression.fit = original_fit
 
     if out is not None:
         profile.iterations = int(out[7]["k"])
+
+    # The pricing scan, measured directly on the shapes the run used. `psi` in
+    # the historical code is (n, 1), so the product is `(1, n) @ (n, m)`.
+    psi = np.zeros((X.shape[0], 1))
+    repeats = 5
+    started = time.perf_counter()
+    for _ in range(repeats):
+        _ = psi.T @ X
+    per_product = (time.perf_counter() - started) / repeats
+    profile.pricing_scan = per_product * max(profile.iterations, 1)
+    profile.pricing_scan_per_iteration = per_product
     return profile, out

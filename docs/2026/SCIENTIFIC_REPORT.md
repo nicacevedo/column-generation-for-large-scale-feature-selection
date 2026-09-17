@@ -189,13 +189,28 @@ a comparison between two configurations.
 scales, `p` from 500 to 5000, threads pinned to one.
 
 ```text
-restricted master conic solve   79 % – 99 % of wall time
-pricing scan (forming X'psi)     0.00 %  -- below measurement resolution
+restricted master conic solve   76.5 % – 99.1 % of wall time
+pricing scan (forming X'psi)     0.04 % –  4.15 %
 ```
 
-Every acceleration the 2025 notes propose — minibatch estimation of `ψ'X`, GPU
-matrix-vector products, approximate pricing — addresses a term under a tenth of
-a percent of the runtime. **`HYP-0007`'s measurable core is supported.**
+**The first version of this measurement said `0.00 %` and was measuring
+nothing.** The profiler patched `np.matmul`, and the historical code writes
+`psi_k_sol.T @ X`; the `@` operator dispatches to `ndarray.__matmul__` in C and
+never reaches the Python-level `np.matmul` symbol, so the wrapper was never
+called. Verified directly: patching `np.matmul` and evaluating `A @ B`
+intercepts zero calls, `np.matmul(A, B)` intercepts one. The master-solve share
+*was* real — `cvxpy.Problem.solve` is an ordinary Python method — so the number
+that mattered was measured and the number the question was about was not.
+Caught here rather than by a reviewer, and corrected by measuring the product
+directly on the shapes the run uses rather than trying to intercept it.
+
+The conclusion survives and is now quantified rather than asserted. The pricing
+scan's share grows with `p` — 0.73 % at `p = 500`, 2.97 % at 2000, 4.15 % at
+5000 — and *shrinks* as the run lengthens, to 0.04 % on the 59-iteration
+historical case, because the master grows and it does not. Every acceleration
+the 2025 notes propose addresses a term that is at most one twenty-fourth of
+the runtime and typically far less. **`HYP-0007`'s measurable core is
+supported**, on a corrected measurement.
 
 The profile also locates the real cost: on the historical dense-truth family at
 `n = 2000, p = 1000` the per-iteration master solve grows from 17 ms to 5.4 s
