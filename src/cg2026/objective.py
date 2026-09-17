@@ -28,6 +28,19 @@ from dataclasses import dataclass
 
 import numpy as np
 
+#: A coefficient below this fraction of the largest one is numerical dust.
+#:
+#: One constant, used by the KKT measure and by the support count, because a
+#: benchmark whose "support size" column and whose "optimality" column disagree
+#: about what zero means is a benchmark with two answers. Calibrated from a
+#: measured tolerance ladder: an interior-point solve at a certified relative
+#: gap of 1e-3 leaves dust up to 7e-5 relative, so anything tighter than this
+#: reports that solver as having selected every feature and as never having
+#: converged. The cost is that a genuinely selected coefficient smaller than
+#: 1e-5 of the largest is counted as zero, which for a sparse-regression
+#: benchmark is the right trade and is stated rather than assumed.
+SUPPORT_RTOL = 1e-5
+
 
 @dataclass(frozen=True, slots=True)
 class Penalty:
@@ -44,8 +57,16 @@ class Penalty:
     def from_thesis(cls, tau: float, kappa: float, theta: float = 0.0) -> Penalty:
         """The 2023 parameterisation: ``lambda_1 = 2 sqrt(tau kappa)``.
 
-        ``theta`` is the 2025 notes' Elastic-Net coefficient on ``(1/2)||beta||_2^2``,
-        so ``lambda_2 = theta/2``.
+        ``theta`` is the **whiteboard §3.4 and `models.py::SOCP_v2`**
+        coefficient on ``(1/2)||beta||_2^2``, so ``lambda_2 = theta/2``.
+
+        It is **not** the April 2025 note's ``lambda_2``, which multiplies
+        ``||beta||_2^2`` with no one-half and must be passed as ``lambda_2``
+        directly. An earlier version of this docstring attributed ``theta`` to
+        that note, which would have cost a reader who followed it exactly half
+        the intended ridge penalty -- a factor-of-two error, in the one
+        function whose entire job is preventing them. Found by an independent
+        review; no caller existed, so it was a trap rather than a bug.
         """
 
         return cls(lambda_1=2.0 * float(np.sqrt(tau * kappa)), lambda_2=theta / 2.0)
@@ -111,7 +132,7 @@ def kkt_violation(
     beta: np.ndarray,
     penalty: Penalty,
     *,
-    support_rtol: float = 1e-9,
+    support_rtol: float = SUPPORT_RTOL,
 ) -> float:
     r"""The distance from zero to the subdifferential, in absolute units.
 
@@ -135,8 +156,17 @@ def kkt_violation(
     a KKT violation of ``27.95`` against ``l1 = 27.87``.
 
     So a coefficient counts as zero when it is below ``support_rtol`` times the
-    largest coefficient. The default is small enough that no genuinely selected
-    feature is dropped and large enough that interior-point dust is.
+    largest coefficient.
+
+    **The default was 1e-9 and that was calibrated for one tolerance only.** An
+    independent review measured the same conic solve over a tolerance ladder
+    and found the dust sitting between 1e-7 and 1e-4 relative at loose
+    settings, so at ``tol = 1e-5`` -- a certified relative gap of 2.8e-03 --
+    the measure still reported ``kkt = 24.42`` against ``l1 = 21.18``:
+    precisely the "this solver never converges" artefact this parameter exists
+    to prevent, in the exact regime the paragraph above describes. The default
+    is 1e-5, which covers the ladder. It is still a threshold and it is still
+    the reason :func:`relative_gap` rather than this is the primary measure.
 
     For a threshold-free measure, use :func:`duality_gap`, which is also a
     certificate. This one is kept because it is the quantity the pricing rule
@@ -191,6 +221,15 @@ def duality_gap(X: np.ndarray, y: np.ndarray, beta: np.ndarray, penalty: Penalty
 
     if penalty.lambda_2 != 0.0:
         raise ValueError("this gap is derived for the LASSO case only")
+    if penalty.lambda_1 == 0.0:
+        # `scale` would be 0, `theta` would be 0, and the gap would be the
+        # whole primal -- a true certificate ("p* is somewhere in [0, F]") and
+        # a useless one, which would read as 100 % unconverged in a benchmark
+        # table at the exact OLS solution. Refused rather than reported.
+        raise ValueError(
+            "with lambda_1 = 0 the rescaled dual point is the origin and the "
+            "gap degenerates to the primal value; use the KKT violation"
+        )
     residual = y - X @ beta
     correlation = float(np.abs(X.T @ residual).max())
     scale = 1.0
@@ -198,5 +237,22 @@ def duality_gap(X: np.ndarray, y: np.ndarray, beta: np.ndarray, penalty: Penalty
         scale = min(1.0, (penalty.lambda_1 / 2.0) / correlation)
     theta = scale * residual
     primal = penalty.value(X, y, beta)
-    dual = float(y @ y - (y - theta) @ (y - theta))
+    # `2 y'theta - theta'theta`, not `||y||^2 - ||y - theta||^2`.
+    #
+    # They are identically equal and the second cancels catastrophically. The
+    # gap is exactly zero at the optimum, so the subtraction of two nearly
+    # equal large numbers is unopposed there, and the certificate goes
+    # NEGATIVE -- which is the one thing a certificate must never do.
+    #
+    # Measured by an independent adversarial review, over 200 000 exactly
+    # optimal points with ||y|| in [1e7, 1e11]: the cancelling form returned a
+    # negative gap in 49.9 % of them, worst -3.35e6 (relative -1.26e-05). This
+    # form returned a negative in 8.3 %, worst -1.22e-04 -- a 10^10 reduction,
+    # with the residual being the primal's own rounding and irreducible.
+    #
+    # Latent rather than live here, because `data.py` standardises by default
+    # so ||y||^2 = n. It is fixed anyway: `relative_gap` is this project's
+    # primary accuracy measure and a public function has no idea who will call
+    # it with what.
+    dual = float(2.0 * (y @ theta) - theta @ theta)
     return primal - dual

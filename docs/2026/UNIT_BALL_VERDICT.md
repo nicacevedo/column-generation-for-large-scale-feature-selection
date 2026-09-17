@@ -13,15 +13,23 @@ As a source of columns:   VALID_COLUMN_OR_DIRECTION_HEURISTIC_ONLY
 As a lower bound:         INVALID_OR_UNJUSTIFIED
 ```
 
-And a third statement that neither label covers, which is the one this audit
-would most want a reader to carry away:
+And a third statement that neither label covers, which took three wrong
+explanations to reach and is the one this audit would most want a reader to
+carry away:
 
 ```text
-On the duals the implemented method actually reaches, across 30 visited duals
-on six instances from four families, the unit-ball value did not exceed the
-primal optimum once. "Unjustified" is what the mathematics supports. "Observed
-to be wrong on this method" is not, and is not claimed.
+Whether the device visibly misbehaves on duals the method actually reaches
+depends on STANDARDISATION, not on dimension and not on p/n.
+
+  standardised data      0 of 24 reachable duals exceed the primal optimum
+  the same data unscaled 24 of 24 exceed, by a median factor of 1.26 to 1.55
 ```
+
+Both the 2025 driver and this project's instance builder standardise. So the
+historical runs would not have shown a bound obviously above the optimum --
+consistent with the 2025 notes reporting *oscillation* rather than an evidently
+invalid bound. The device is unjustified either way; standardisation hides the
+symptom.
 
 ---
 
@@ -94,19 +102,37 @@ and a converged reference optimum at each one.
 
 ```text
 duals visited                                     30
-instances                                          6   (four families)
+instances                                          6   (four families, standardised)
 duals where g_ball > p*                            0
 worst relative excess                            0.0
 ```
 
-**Not one.** The verdict on the existence clause is
-`NOT_OBSERVED_ON_REACHABLE_SET`, which is weaker than refutation and is
-reported as such rather than collapsed into it. Thirty duals on small
-instances is not a proof that it cannot happen; it is evidence that it does not
-happen readily, and the reason it does not is worth stating: the master's dual
-is the dual of a *restriction* of the primal, so `d(ψᵏ)` tracks an upper bound
-on `p*` from above as the column set grows, and the ball's penalty term is
-subtracted from it.
+**Not one — and an independent adversarial review reached the opposite
+conclusion on its own instances, including 22 % above `p*` inside the
+historical code itself.** Both measurements are correct. Resolving them took
+three attempts, and the first two are recorded because being wrong twice in
+public is cheaper than being wrong once in private:
+
+1. *"It is about the exhibit."* The review's objection was that `ψ = −1.5` is
+   unreachable. True, and the reachable `ψ = −2y` — the dual of the master
+   before any column exists, which every run visits — is **worse**: 81 against
+   `p* = 9.75` on the same instance.
+2. *"It is about dimension."* Measured across `p ∈ {2, 5, 60}` at `n = 30`:
+   `0, 0, 12/12`. Suggestive, and wrong — those runs were unstandardised.
+3. **It is about standardisation.** Holding `(n, p)` fixed and toggling only
+   that flag: `0/24` standardised, `24/24` unstandardised.
+
+The mechanism is scale. At `ψ = −2y` the value is
+`‖y‖² + min_{‖β‖₂≤1}[a'β + λ₁‖β‖₁]`, and the inner term is bounded below by
+`−‖X'ψ‖₂`. Standardising sets `‖y‖² = n` and every column norm to `√n`, which
+puts the two terms on the same scale and drives the value below `p*`. Unscaled,
+`‖y‖²` dwarfs anything a unit ball can subtract and the raw dual objective
+shows through.
+
+The verdict on the existence clause is therefore
+`SUPPORTED_ON_UNSTANDARDISED_DATA` and
+`NOT_OBSERVED_ON_STANDARDISED_DATA`, which is two statements rather than one
+and is the honest count.
 
 ## 4. Why the device is nonetheless fine as a column source
 

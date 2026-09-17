@@ -25,7 +25,12 @@ from typing import Any
 
 import numpy as np
 
-from src.cg2026.objective import Penalty, kkt_violation, relative_gap
+from src.cg2026.objective import (
+    SUPPORT_RTOL,
+    Penalty,
+    kkt_violation,
+    relative_gap,
+)
 
 
 @dataclass(slots=True)
@@ -72,11 +77,14 @@ def _finish(
         objective=penalty.value(X, y, beta),
         kkt=kkt_violation(X, y, beta, penalty),
         gap=relative_gap(X, y, beta, penalty) if penalty.lambda_2 == 0 else None,
-        # A coefficient below 1e-12 is numerical dust, not a selected feature.
-        # Interior-point solvers return dense vectors of tiny values and
-        # counting them as support would make every conic solve look like it
-        # selected everything.
-        nnz=int((np.abs(beta) > 1e-12).sum()),
+        # Relative, not absolute, and the same constant the KKT measure uses.
+        #
+        # The absolute 1e-12 this used to be did exactly what its own comment
+        # said it prevented: measured on a conic solve whose objective matched
+        # LARS to eight digits, with a true support of 3, it reported 30 of 30.
+        # Interior-point dust is proportional to the solution's scale, so the
+        # threshold has to be too.
+        nnz=int((np.abs(beta) > SUPPORT_RTOL * max(np.abs(beta).max(), 1e-300)).sum()),
         tol=tol,
         status=status,
         iterations=iterations,
@@ -287,30 +295,50 @@ def solve_cg_hist(
 
     import cvxpy as cp
 
-    from src.cg2026.cg_hist_compat import CG_LASSO_SOC1_v2
+    from src.cg2026.cg_hist_compat import CG_LASSO_SOC1_v2 as _run_historical
 
     if penalty.lambda_2 != 0:
         raise NotImplementedError("the historical CG is the LASSO one")
     tau = kappa = penalty.lambda_1 / 2.0
     buffer = io.StringIO()
     wall, cpu = time.perf_counter(), time.process_time()
-    with contextlib.redirect_stdout(buffer):
-        out = CG_LASSO_SOC1_v2(
+    try:
+        with contextlib.redirect_stdout(buffer):
+            out = _run_historical(
+                X,
+                y,
+                tau,
+                kappa,
+                solver=cp.CLARABEL,
+                solver_params={},
+                solver_verbose=False,
+                add_constant=False,
+                save_conv_info=True,
+                v=v,
+                v0=0,
+                cg_lambda_tol=tol,
+                cg_residuals_tol=tol,
+                time_limit=time_limit_minutes,
+                unboundedness_policy=policy,
+            )
+    except Exception as exc:  # noqa: BLE001 - a crash is a measurement
+        # `unit_ball` with an empty initial master (`v0 = 0`) reaches
+        # `LinearRegression().fit` on a matrix with zero columns and raises.
+        # That is a real property of the historical code under these settings
+        # and is recorded as one rather than allowed to abort a whole
+        # benchmark cell.
+        wall, cpu = time.perf_counter() - wall, time.process_time() - cpu
+        return _finish(
+            f"cg_hist_{policy}",
+            np.zeros(X.shape[1]),
             X,
             y,
-            tau,
-            kappa,
-            solver=cp.CLARABEL,
-            solver_params={},
-            solver_verbose=False,
-            add_constant=False,
-            save_conv_info=True,
-            v=v,
-            v0=0,
-            cg_lambda_tol=tol,
-            cg_residuals_tol=tol,
-            time_limit=time_limit_minutes,
-            unboundedness_policy=policy,
+            penalty,
+            tol,
+            wall,
+            cpu,
+            status=f"raised:{type(exc).__name__}",
+            detail={"error": str(exc)[:300]},
         )
     wall, cpu = time.perf_counter() - wall, time.process_time() - cpu
     if out is None:
@@ -327,6 +355,18 @@ def solve_cg_hist(
             wall,
             cpu,
             status="no_dual_solution",
+        )
+    if not isinstance(out, tuple) or len(out) != 8:  # pragma: no cover
+        return _finish(
+            f"cg_hist_{policy}",
+            np.zeros(X.shape[1]),
+            X,
+            y,
+            penalty,
+            tol,
+            wall,
+            cpu,
+            status="unexpected_return",
         )
     beta, _xi, _a, _b, _value, _tmin, _tpmin, info = out
     hit_limit = (wall / 60.0) >= time_limit_minutes

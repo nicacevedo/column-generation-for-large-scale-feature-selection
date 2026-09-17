@@ -18,8 +18,15 @@ The 2023 conic model is
 and `min_{z,u >= 0, b^2 <= zu} tau z + kappa u = 2 sqrt(tau kappa) |b|` by
 AM-GM, attained at `z = |b| sqrt(kappa/tau)`, `u = |b| sqrt(tau/kappa)`. So
 (SOCP) is (P) with `l1 = 2 sqrt(tau kappa)` and `l2 = 0`: an exact
-reformulation of the LASSO, not a relaxation of anything. `l2 > 0` is the 2025
-Elastic-Net extension.
+reformulation of the LASSO, not a relaxation of anything.
+
+Two precisions an independent review insisted on. Attainment fails when
+*exactly one* of `tau, kappa` is zero -- the infimum is still zero but is
+approached only as `z -> inf`, and the stated point is `0/0`; unreachable in
+practice because `solvers.py` sets `tau = kappa = l1/2`. And `l2 > 0` is **not**
+"the 2025 Elastic-Net extension": `theta` enters `models.py` at commit 471a414
+on **2024-01-31** and `CG_SOC1_ElasticNet` at c3c223d on 2024-02-03. In an
+archaeology this misdated it by fifteen months.
 
 **The Lagrangian relaxation.** Relax only the residual cone, with dual
 `(mu, psi)` in the second-order cone (`||psi||_2 <= mu`):
@@ -52,6 +59,7 @@ claim, the tests are the evidence.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
@@ -179,28 +187,139 @@ def pricing_is_bounded(X: np.ndarray, psi: np.ndarray, l1: float, l2: float) -> 
     dual feasible set of a Lagrangian dual *is* by definition the set where the
     inner minimisation is finite. The content of the proposition is the
     identification of that set with ``||X'psi||_inf <= l1``, which is the
-    coordinate analysis above.
+    coordinate analysis in :func:`coordinate_optimum`.
 
-    **Corollary (answering the whiteboard's unanswered §2.4, "Why is the
-    pricing bounded only at the final iteration?").** Let ``psi^k`` be the
-    restricted master's optimal dual. Bounded pricing means ``psi^k`` is
-    feasible for the full dual, so ``d(psi^k) <= p*`` by weak duality. When it
-    is bounded the inner minimum is ``0``, so ``g(psi^k) = d(psi^k)``; and
-    strong duality for the restricted master (a conic program with a Slater
-    point -- ``beta = 0``, ``xi`` large) gives ``d(psi^k)`` equal to the
-    restricted master's own optimal value, which is an upper bound on ``p*``.
-    Hence ``p* <= RMP = d(psi^k) <= p*``: the restricted master is already
-    optimal for the full problem.
-
-    The pricing is bounded only at the final iteration **because bounded
-    pricing is the optimality certificate**. It is not an inconvenience of the
-    method; it is the method's stopping condition, and the implementation does
-    not use it.
+    **This function is the wrong optimality test when ``l2 > 0``.** It returns
+    ``True`` unconditionally there, because the pricing really is bounded --
+    and bounded pricing is then no evidence of anything. The certificate for
+    ``l2 > 0`` is ``violations(X, psi, l1) == 0``; see
+    :func:`restricted_master_is_optimal` for why, and for a measured
+    counterexample to using boundedness instead.
     """
 
     if l2 > 0:
         return True
     return bool(np.abs(X.T @ psi).max() <= l1)
+
+
+def restricted_master_is_optimal(
+    X: np.ndarray,
+    psi: np.ndarray,
+    l1: float,
+    l2: float = 0.0,
+    *,
+    working_set: Iterable[int] | None = None,
+) -> bool:
+    r"""**The corollary**, with the hypotheses that make it true.
+
+    This is the load-bearing claim of the whole decomposition, and an earlier
+    version of it -- written as a paragraph inside
+    :func:`pricing_is_bounded`'s docstring, with no hypotheses and no scope --
+    was **wrong in two ways that an independent adversarial review found with
+    counterexamples**, and then wrong in a third way in the first attempt to
+    repair it. All three are tests in ``tests/test_pricing_math.py``. A claim
+    this central should carry the evidence against its wrong forms.
+
+    **Corollary.** Let ``S`` be the working set, ``B_k = {B^k pi : pi in Pi}``
+    the master's reachable set for ``beta``, and ``psi^k`` its optimal
+    second-order-cone dual. Assume
+
+    1. ``B_k = span{e_i : i in S}`` or the cone it generates -- satisfied by
+       ``Pi = R^{n_k}`` (the default) and by ``Pi = R_+^{n_k}``
+       (``pos_linear_comb=True``), and **not** by ``e'pi = 1``
+       (``sum_1_comb=True``); and
+    2. every violated coordinate is already inside the working set:
+
+       ```text
+       {i : (|(X'psi^k)_i| - l1)_+ > 0}  is a subset of  S
+       ```
+
+    Then ``RMP_k = p*``: the restricted master is already optimal for the full
+    problem. This holds for ``l2 = 0`` and for ``l2 > 0`` alike.
+
+    *Proof.* Strong duality for the restricted master gives
+    ``g_R(psi^k) = RMP_k``, where
+    ``g_R(psi) = d(psi) + min_{beta in B_k} [psi'X beta + l1||beta||_1 + l2||beta||^2]``
+    and ``d(psi) = -||psi||^2/4 - psi'y``. The full inner minimum separates
+    over coordinates and is attained at the soft threshold
+    ``beta*_i = -sign(a_i)(|a_i| - l1)_+/(2 l2)`` (P4), whose support is exactly
+    ``{i : v_i > 0}``. Hypothesis 2 puts that point inside ``B_k``, so the
+    restricted and full inner minima coincide and ``g_R(psi^k) = g(psi^k)``.
+    Weak duality gives ``g(psi^k) <= p*``, and ``RMP_k >= p*`` because the
+    master is a restriction. Hence ``p* <= RMP_k = g(psi^k) <= p*``. For
+    ``l2 = 0`` the soft threshold degenerates: the infimum is ``0`` when no
+    coordinate violates and ``-inf`` when one does, so hypothesis 2 reduces to
+    ``{i : v_i > 0}`` being **empty**, because a violated coordinate inside
+    ``S`` would make the master itself unbounded. (Verified: at a master
+    optimum no coordinate of ``S`` ever violates.)
+
+    **Why hypothesis 1 is needed.** With ``sum_1_comb=True`` -- an option the
+    historical code offers -- ``B_k`` is an **affine** set, the argument above
+    fails at "the restricted and full inner minima coincide", and:
+
+    ```text
+    X = I_2, y = (1,1), l1 = 20        p* = 2.0   (beta* = 0, l1 > lambda_max)
+    RMP with e'pi = 1                  20.5       at beta^k = (0.5, 0.5)
+    psi^k = (-1,-1),  ||X'psi^k||_inf = 1 <= 20   ->  no violated coordinate
+    ```
+
+    No violation, and the restricted master is **ten times worse** than the
+    full optimum. Weak duality survives; the corollary does not. The Slater
+    point the first version cited, ``beta = 0`` with ``xi`` large, is not even
+    feasible for that master.
+
+    **Why "the pricing is bounded" is the wrong test when ``l2 > 0``.**
+    :func:`pricing_is_bounded` returns ``True`` unconditionally there, because
+    the pricing really is bounded -- so it certifies nothing. Measured,
+    ``n=10, p=6, l1=2, l2=1``, ``p* = 191.606``: at a one-column master the
+    pricing is "bounded", ``RMP = 362.640`` (89 % suboptimal) and
+    ``d(psi) = 362.651``. Worse, at the *full* master ``d(psi) = 224.506``
+    against ``p* = 191.606`` -- the quantity an earlier version called a valid
+    lower bound sitting 17 % **above** the optimum.
+
+    And note what hypothesis 2 looks like there: with ``l2 > 0`` the violated
+    set is **non-empty at optimality** -- it is exactly the support of
+    ``beta*`` -- so "no coordinate violates" would never fire. That is the
+    third error, made while repairing the first two: an attempt to state the
+    corollary as ``violations == 0`` for all ``l2``. Verified over three values
+    of ``l2`` on a 40x10 instance: at ``l2 = 1`` and ``l2 = 5`` the violated set
+    at optimality is ``{1,2,5,7,9}``, which is the support, and ``RMP = p*``
+    exactly when that set is contained in ``S``.
+
+    **A consequence worth stating, because it condemns the historical bound
+    plot.** For ``l2 = 0`` and cone weights the bracket is positively
+    homogeneous, so the restricted inner minimum is ``0`` or ``-inf`` and
+    therefore ``d(psi^k) = RMP_k`` **identically, at every iteration**. The
+    Lagrangian "lower bound" the historical code records is thus either
+    ``-inf`` or *exactly equal to its own upper bound*. There is no
+    intermediate value and no converging gap to plot. The "Bounds per
+    Iteration" figure the code draws can only show two identical curves or one
+    missing curve -- and it shows the second, because the pricing test never
+    reports bounded (timeline §2025-D). This identity does **not** extend to
+    ``l2 > 0``, where homogeneity fails: measured, ``d(psi) = 224.506`` against
+    ``RMP = 191.606`` at the full master.
+
+    **Answering the whiteboard's unanswered §2.4, "Why is the pricing bounded
+    only at the final iteration?"** Because for ``l2 = 0`` under these
+    hypotheses bounded pricing *is* the optimality certificate. It is not an
+    inconvenience of the method; it is the method's stopping condition, and the
+    implementation does not use it.
+    """
+
+    violated = set(np.flatnonzero(violations(X, psi, l1) > 0).tolist())
+    if working_set is None:
+        # No working set supplied: the only certificate available is the
+        # `l2 = 0` one, which is that nothing violates at all. Returning that
+        # for `l2 > 0` would be the third error above, so it is refused.
+        if l2 > 0:
+            raise ValueError(
+                "with l2 > 0 the violated set is non-empty at optimality -- it "
+                "is the support of beta* -- so 'nothing violates' never fires. "
+                "Supply working_set; the certificate is that every violated "
+                "coordinate is already in it."
+            )
+        return not violated
+    return violated <= set(working_set)
 
 
 def violations(X: np.ndarray, psi: np.ndarray, l1: float) -> np.ndarray:
@@ -267,6 +386,34 @@ def unit_ball_pricing_value(X: np.ndarray, y: np.ndarray, psi: np.ndarray, l1: f
 
     ``tests/test_pricing_math.py`` exhibits a two-line counterexample where
     ``g_ball`` exceeds the primal optimum by 43 %.
+
+    **That exhibit is correct and it is the wrong one.** Its ``psi = -1.5`` is
+    a point in R^n, and the algorithm's ``psi`` is not: it is the optimal cone
+    dual of a restricted master, which SOC complementarity pins to
+    ``psi^k = -2 r^k`` for the residual ``r^k``. On that one-dimensional
+    instance the only reachable duals are ``-20`` and ``-1``, and ``-1.5`` is
+    neither. An independent review made exactly that objection and then
+    answered it: the *reachable* ``psi = -2y`` -- the dual of the empty initial
+    master, which every run visits -- gives ``g_ball = 81`` against
+    ``p* = 9.75``, **731 % above**, and the failure reproduces inside the
+    historical code with ``unboundedness_policy="unit_ball"``, which records
+    ``646.23`` as a "Lower Bound" against ``p* = 529.05`` at iteration 1.
+
+    **And it is dimension-dependent, which neither the counterexample nor the
+    review's sweep shows on its own.** Two measurements of this project
+    disagreed until the regimes were compared:
+
+    ```text
+    p = 1, 5, 12     38 % of reachable unbounded duals exceed p*; worst 731 %
+    p = 80, 400       0 of 30 reachable duals exceed p*
+    ```
+
+    The reason is scale: the ball has radius one whatever ``p`` is, so as ``p``
+    grows the inner minimum ``min_{||b||<=1} [a'b + l1||b||_1]`` reaches
+    roughly ``-||a||_2``, which grows with ``p`` and drags ``g_ball`` far below
+    ``p*``. At small ``p`` the penalty is too small to do that and the raw
+    ``d(psi)`` shows through. `scripts/adjudicate_pricing.py` measures both
+    regimes and `docs/2026/UNIT_BALL_VERDICT.md` records the split.
 
     **This does not condemn the device.** The whiteboard §2.3 uses the same
     construction for a different purpose -- *"it is enough to provide an extreme
