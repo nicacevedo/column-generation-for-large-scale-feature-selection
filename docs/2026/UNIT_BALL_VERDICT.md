@@ -162,9 +162,35 @@ parameters):
 | `unit_ball` (2025) | 1.010 min | 74 |
 | `negative_gradient` (2025) | 1.006 min | 72 |
 
-Both 2025 pricing ideas are ~4× slower than the 2023 method they were meant to
+Both 2025 pricing ideas are slower than the 2023 method they were meant to
 improve, at the same objective, and the note's own reading agrees: *"it starts
 to oscillate instead of converge … still worse than v_solution alone."*
+
+**The two 2025 times are censored, and the `converged` column is meaningless.**
+Corrected after review. `new_main.py:28` sets `time_limit = 1` minute, and
+`cg_models.py:142` breaks the column generation loop as soon as elapsed time
+passes it. Both 2025 rows sit just *past* that cap -- 1.0103 and 1.0057 minutes
+-- so both were truncated mid-solve, and their wall times are **lower bounds**
+on what the policies would have taken to finish. The `status` column says
+`converged` for all three rows, but that string is a hardcoded literal written
+unconditionally at `new_main.py:373`; it records nothing about how any run
+ended.
+
+Two consequences, in opposite directions:
+
+- The multiplier is not "~4x". It is **"at least 3.8x"** (1.0057 / 0.2624 and
+  1.0103 / 0.2624), with no upper bound available from this data. The
+  conclusion that the 2025 ideas are worse is *strengthened* by the censoring,
+  not weakened -- but the specific figure was never measurable and is
+  withdrawn.
+- The comparison rests on **n = 1** per policy, on a single instance, with no
+  repetition and no variance estimate. Whatever it supports, it does not
+  support a precise ratio.
+
+What survives is the qualitative ordering, which the censoring makes safe:
+`v_solution` finished in 0.262 min while both 2025 policies were still running
+at 1.0 min, all three at objectives agreeing to about 1e-9.
+
 
 The brief's instruction not to repeat already-failed 2025 ideas without a new
 theoretical reason applies here, and this audit supplies a theoretical reason

@@ -1,0 +1,32 @@
+id: DEC-0001
+type: decision
+schema_version: 1
+status: accepted
+title: Report objective excess alongside the preregistered gap metric
+statement: >-
+  EXP-0001's frozen primary metric -- wall time to a certified relative duality
+  gap of 1e-6 -- is retained unchanged as the decision rule. A secondary,
+  explicitly post-hoc metric is added and reported beside it: the relative
+  objective excess (F - F*)/F* against the best objective any arm reached on
+  the same cell, and the wall time to reach a matched objective of 1e-6.
+rationale: >-
+  An adversarial review of the empirical case established that the two metrics
+  disagree, and that the preregistered one alone is misleading. The duality gap
+  is built by rescaling the residual, making it first order in the KKT
+  overshoot, while objective suboptimality is second order. Measured
+  consequence on the sparse family: cg_hist fails the 1e-6 certificate on
+  essentially every cell while matching the best objective to between 1e-14 and
+  1e-10 on ten of eleven, with one genuine failure at 8.8e-04. Reporting only
+  the certificate would license the sentence "the historical method does not
+  reach the target accuracy", which is false about the answer it returns. The
+  preregistered rule is not replaced, because it was frozen before results
+  existed and that is precisely when replacing it would be illegitimate; it is
+  supplemented, and the supplement is labelled post-hoc everywhere it appears.
+alternatives_considered:
+  - >-
+    Replace the primary metric with objective excess. Rejected: the rule was
+    preregistered at commit 0275e54 before any result existed, and swapping it
+    after seeing results is the failure mode preregistration exists to prevent.
+  - >-
+    Report only the certificate. Rejected: it produces a true statement about
+    dual feasibility that reads as a false statement about solution quality.

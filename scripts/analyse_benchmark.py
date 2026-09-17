@@ -46,17 +46,73 @@ def time_to_target(records: list[dict[str, Any]]) -> tuple[float | None, float |
     for record in records:
         if record.get("status") == "ok" and record.get("relative_gap") is not None:
             by_tol[float(record["tol"])].append(record)
-    best: tuple[float, float] | None = None
-    # Loosest first: a larger `tol` is a weaker request, and the rule asks for
-    # the cheapest configuration that still reaches the accuracy.
+    # **The loosest qualifying tolerance, and only that one.**
+    #
+    # An earlier version of this function looped over every qualifying
+    # tolerance and kept the fastest. That is not what the manifest says, and
+    # an adversarial review measured the difference: 10 of 40 (cell, solver)
+    # pairs affected, up to 1.82x, and always in the direction that lowers
+    # M(c) and therefore favours the reported conclusion. Silent per-solver
+    # best-case selection.
+    #
+    # It is restored to the frozen rule rather than the rule amended, because
+    # the deviation was discovered after results existed and the whole point of
+    # freezing it was that this is when it matters.
     for tol in sorted(by_tol, reverse=True):
         rows = by_tol[tol]
         gap = statistics.median(float(r["relative_gap"]) for r in rows)
         if gap <= TARGET_GAP:
-            wall = statistics.median(float(r["wall_seconds"]) for r in rows)
-            if best is None or wall < best[0]:
-                best = (wall, gap)
-    return best if best else (None, None)
+            return statistics.median(float(r["wall_seconds"]) for r in rows), gap
+    return None, None
+
+
+def objective_excess(records: list[dict[str, Any]], reference: float) -> float | None:
+    """The best relative objective excess this solver reached, ``(F - F*)/F*``.
+
+    **Not a preregistered metric, and the one a reader actually wants.** The
+    preregistered rule is time to a certified relative duality gap of 1e-6, and
+    that gap is built by rescaling the residual, so it is *first order* in the
+    KKT overshoot while objective suboptimality is *second order*. A solver can
+    therefore be disqualified on the certificate while its answer is optimal to
+    eleven significant figures -- which an adversarial review showed is exactly
+    what happens to `cg_hist` on eight of nine cells.
+
+    Reported alongside the frozen rule, never instead of it, and recorded as a
+    post-hoc addition in `.research/decisions/DEC-0001.yaml`.
+    """
+
+    best: float | None = None
+    for record in records:
+        value = record.get("objective")
+        if value is None or record.get("status") not in {"ok", "time_limit"}:
+            continue
+        excess = (float(value) - reference) / abs(reference) if reference else 0.0
+        if best is None or excess < best:
+            best = excess
+    return best
+
+
+def time_at_matched_objective(
+    records: list[dict[str, Any]], reference: float, tolerance: float
+) -> float | None:
+    """Median wall time at the loosest tolerance reaching ``tolerance`` excess.
+
+    The same shape as the frozen rule, with the objective in place of the
+    certificate. Post-hoc; see :func:`objective_excess`.
+    """
+
+    by_tol: dict[float, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        if record.get("status") in {"ok", "time_limit"} and record.get("objective"):
+            by_tol[float(record["tol"])].append(record)
+    for tol in sorted(by_tol, reverse=True):
+        rows = by_tol[tol]
+        excess = statistics.median(
+            (float(r["objective"]) - reference) / abs(reference) for r in rows
+        )
+        if excess <= tolerance:
+            return statistics.median(float(r["wall_seconds"]) for r in rows)
+    return None
 
 
 def best_gap(records: list[dict[str, Any]]) -> tuple[float | None, float | None]:
@@ -106,7 +162,10 @@ def main() -> int:
     print(f"arms that produced no records: {len(incomplete)}")
     print()
 
-    header = f"{'instance':34} {'ratio':>6} {'best modern':>22} {'cg_hist':>26}  {'verdict':>9}"
+    header = (
+        f"{'instance':30} {'ratio':>5} {'best modern':>20} {'cg_hist':>24} "
+        f"{'cg obj excess':>14}  {'verdict':>9}"
+    )
     print(header)
     print("-" * len(header))
 
@@ -117,7 +176,21 @@ def main() -> int:
     lagrangian_nonzero: list[str] = []
     cg_status: dict[str, int] = defaultdict(int)
 
+    matched: list[tuple[str, float, float]] = []
+
     for (label, ratio), arms in sorted(cells.items()):
+        # The best objective any arm reached on this cell. Every arm solves the
+        # *same* convex problem, so this is a legitimate common reference: the
+        # minimum of a set of upper bounds on one minimum.
+        reference: float | None = None
+        for row in arms.values():
+            for record in row.get("records", ()):
+                value = record.get("objective")
+                if value is None or record.get("status") not in {"ok", "time_limit"}:
+                    continue
+                if reference is None or float(value) < reference:
+                    reference = float(value)
+
         modern: dict[str, float] = {}
         for name in MODERN:
             row = arms.get(name)
@@ -173,7 +246,34 @@ def main() -> int:
             cg_text = "no result"
         else:
             cg_text = f"{cg_wall:.4f}s"
-        print(f"{label:34} {ratio:6} {best_text:>22} {cg_text:>26}  {verdict:>9}")
+
+        # The objective column. A cell where cg_hist misses the certificate but
+        # matches the objective to 1e-11 is a *different* result from one where
+        # it misses both, and the certificate column cannot tell them apart.
+        excess_text = "n/a"
+        if cg_row and "records" in cg_row and reference is not None:
+            excess = objective_excess(cg_row["records"], reference)
+            if excess is not None:
+                excess_text = f"{excess:+.2e}"
+                cg_matched = time_at_matched_objective(cg_row["records"], reference, 1e-6)
+                best_modern_matched = None
+                for name in MODERN:
+                    row = arms.get(name)
+                    if not row or "records" not in row:
+                        continue
+                    value = time_at_matched_objective(row["records"], reference, 1e-6)
+                    if value is not None and (
+                        best_modern_matched is None or value < best_modern_matched
+                    ):
+                        best_modern_matched = value
+                if cg_matched and best_modern_matched:
+                    matched.append(
+                        (f"{label} r={ratio}", cg_matched / best_modern_matched, cg_matched)
+                    )
+        print(
+            f"{label:30} {ratio:5} {best_text:>20} {cg_text:>24} "
+            f"{excess_text:>14}  {verdict:>9}"
+        )
 
     print()
     print("=" * 72)
@@ -188,16 +288,49 @@ def main() -> int:
         f"{'  (on the cells measured so far)' if len(cells) < 30 else ''}"
     )
     print()
-    print("HYP-0005  the historical scikit-learn baseline was not converging")
-    print(
-        f"  cells where current scikit-learn reached gap < 1e-8 without "
-        f"hitting max_iter: {sklearn_ok}/{sklearn_total}"
-    )
+    print("SECONDARY (post-hoc, DEC-0001): slowdown at MATCHED OBJECTIVE 1e-6")
+    print("  The preregistered rule scores the duality-gap certificate, which is")
+    print("  first order in the KKT overshoot while objective suboptimality is")
+    print("  second order. This is the same comparison against the answer.")
+    if matched:
+        factors = sorted(f for _, f, _ in matched)
+        print(f"  cells comparable   {len(matched)}")
+        print(f"  slowdown  min {factors[0]:.1f}x  median "
+              f"{statistics.median(factors):.1f}x  max {factors[-1]:.1f}x")
+        for name, factor, wall in sorted(matched, key=lambda item: -item[1]):
+            print(f"    {name:34} {factor:8.1f}x  (cg_hist {wall:.3f}s)")
+    else:
+        print("  cells comparable   0")
     print()
-    print("HYP-0006  the CG method never computes a Lagrangian lower bound")
+    # Also not a verdict on the hypothesis whose id used to head this block.
+    # HYP-0005 is about the 2023 runs; this measures 2026 scikit-learn on 2026
+    # instances, which cannot confirm or deny anything about them. HYP-0005 was
+    # settled separately, and rejected, by reading the committed 2023 CSVs
+    # (EVI-0001): two of its three configurations stopped below max_iter.
+    print("OBSERVATION  does current scikit-learn converge on these instances")
+    print(
+        f"  cells reaching gap < 1e-8 without hitting max_iter: "
+        f"{sklearn_ok}/{sklearn_total}"
+    )
+    print("  Context for the modern baseline's credibility, not a test of HYP-0005.")
+    print()
+    # NOT a verdict on HYP-0006. An earlier version printed this block under
+    # HYP-0006's id with the caption "the CG method never computes a Lagrangian
+    # lower bound", which is not what HYP-0006 says. HYP-0006 is about whether
+    # the method *terminates* through the pricing test rather than through the
+    # dual-stall criterion, and nothing recorded here answers that -- the run
+    # detail carries no termination reason. Mislabelling a side observation
+    # with a hypothesis id is how an unrelated measurement gets read as a
+    # result, so the caption is now the observation and the id is gone.
+    print("OBSERVATION  when the Lagrangian lower bound gets computed at all")
     print(f"  cg_hist run statuses: {dict(cg_status)}")
-    print(f"  cells with a non-zero Lagrangian bound count: {len(lagrangian_nonzero)}")
-    print(f"  VERDICT  {'SUPPORTED' if not lagrangian_nonzero else 'REJECTED'}")
+    print(f"  runs recording a bound: {len(lagrangian_nonzero)}")
+    for item in sorted(set(lagrangian_nonzero)):
+        print(f"    {item}")
+    print(
+        "  Bears on HYP-0006's stated mechanism -- that the boundedness test "
+        "always fires -- without settling its termination claim."
+    )
     if len(cells) < 30:
         print()
         print(

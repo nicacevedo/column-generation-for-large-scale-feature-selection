@@ -100,11 +100,24 @@ There is no `ORIGINAL_REPRODUCTION` row and there cannot be one on this host.
 Run on new instances with the compatibility copy, threads pinned to one
 (`results/2026/profile.json`):
 
-- **The Lagrangian lower bound is never computed.** Under `v_solution` the
-  pricing test reports unbounded on every iteration, so the Lagrangian model is
-  skipped and `lagrangian_values` stays empty. The 2025 notes say exactly this:
-  *"in the old version we didn't even have a lower bound."* Asserted as a test,
-  `tests/test_solver_agreement.py::test_the_historical_method_never_records_a_lagrangian_bound`.
+- **The Lagrangian lower bound is computed only at a large penalty.**
+  Corrected: an earlier revision of this file said "never computed", and
+  `EXP-0001` then recorded one on four cells -- every one at
+  `lambda_ratio = 0.5`, `tol = 1e-8`, one each on
+  `sparse-n2000-p500`, `sparse-n2000-p5000`, `sparse-n10000-p1000` and
+  `historical-n2000-p500`.
+
+  The boundedness test at `cg_models.py:446` is
+  `|psi'X| > 2·sqrt(kappa·tau) − cg_lambda_tol`, and `tau = kappa = lambda_1/2`,
+  so its threshold grows with the penalty. At a small penalty it fires on every
+  iteration, the Lagrangian model is skipped, and `lagrangian_values` stays
+  empty. At a large one it can fail to fire, and a bound is recorded. The 2025
+  note *"in the old version we didn't even have a lower bound"* is accurate for
+  the regime it was written in and false as a universal.
+
+  Both sides of the boundary are pinned by
+  `tests/test_solver_agreement.py::test_the_lagrangian_bound_is_recorded_only_at_large_lambda`
+  (0 at `0.15·λmax`, at least 1 at `0.7·λmax`).
 - **Termination is the dual-stall heuristic**, not the pricing certificate —
   `HYP-0006`, and the mathematical audit says why it must be: at optimality the
   KKT conditions put `|aᵢ| = λ₁` exactly on the support, and the shipped test is

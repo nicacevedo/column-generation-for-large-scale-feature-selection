@@ -177,11 +177,24 @@ bound plotting raises on any termination path with `k ≥ 4`, which is consisten
 with the 2025 notes' transcript ending at "Plotting bounds..." and nothing
 after.
 
-**A reproduction-fidelity limitation found by review and not yet closed**: the
-benchmark adapter runs the historical function's *own* defaults, and the 2025
-driver sets `pos_linear_comb=True` and `v = v0 = max(int(m·0.012), 5)`, which
-costs 4–7× the iterations. Any comparison against the committed 2025 timings is
-a comparison between two configurations.
+**Two reproduction-fidelity limitations found by review and not yet closed.**
+
+*Configuration drift.* The 2025 driver sets `pos_linear_comb=True` and
+`v = v0 = max(int(m·0.012), 5)`, which costs 4–7× the iterations; the benchmark
+adapter does not. Any comparison against the committed 2025 timings is a
+comparison between two configurations.
+
+*The adapter does not run "the function's own defaults".* An earlier revision
+of this paragraph said it did, and that is wrong. The historical signature
+defaults `solver_params` to
+`{'mosek_params': {'MSK_DPAR_INTPNT_CO_TOL_REL_GAP': 1e-6}}`
+(`src/cg_models.py:50`) -- a MOSEK-only dictionary. MOSEK is unlicensed here, so
+the adapter passes `solver_params={}` and the master runs on Clarabel at *its*
+built-in tolerance. The consequence is material and is documented at the point
+of the decision in `src/cg2026/solvers.py`: the benchmark's `tol` never reaches
+the restricted master, only the CG loop's termination tests, so `cg_hist`'s
+achieved duality gap is flat across the whole tolerance ladder while every
+other arm's moves five orders of magnitude. See §K.1.
 
 ## I. Profiling
 
@@ -226,54 +239,169 @@ levels scaled to `λmax`, seven arms each over its own tolerance ladder, threads
 pinned before numpy loads, a 600 s per-cell timeout, and a frozen
 failure-and-exclusion policy.
 
+### J.1 What code the frozen run is actually executing
+
+`EXP-0001` runs in a Research OS worktree pinned at **`0275e54`**, the commit
+that froze it. That is the point of the worktree, and it has a consequence
+worth stating plainly, because two metric repairs landed *after* the freeze and
+are therefore **not** in the run:
+
+| repair | commit | in `EXP-0001`? | effect on the run |
+|---|---|---|---|
+| `SUPPORT_RTOL` for `nnz` and `kkt` | `7c26f3d` | **no** | the shipped JSONL's `nnz` and `kkt` follow the old exact-zero rule (`|beta| > 1e-12`) |
+| cancellation-safe `duality_gap` | `7c26f3d` | **no** | none measurable; see below |
+
+The `nnz`/`kkt` columns in `results/2026/EXP-0001.jsonl` are consequently
+*not* the quantities defined in the current `src/cg2026/objective.py`, and
+should not be read as such. Neither enters the preregistered decision rule or
+the `DEC-0001` secondary, both of which are built from `wall_seconds`,
+`relative_gap` and `objective`.
+
+The gap repair needed checking rather than assuming, because `relative_gap`
+*is* the primary metric. The frozen form computes the dual value as
+`y'y - (y-theta)'(y-theta)` and the repaired one as `2 y'theta - theta'theta`;
+these are algebraically identical, and the repair was for catastrophic
+cancellation, not for correctness. Measured difference between them on six
+sparse cells at `tol = 1e-10`, where the gaps sit around 1e-9:
+
+```text
+max relative difference   4.3e-04     (i.e. ~1e-13 absolute)
+```
+
+Four orders of magnitude below the 1e-6 decision threshold, so the frozen run's
+primary metric stands. Recorded because "the fragile version was used" is a
+fact about the experiment either way, and a reader should not have to take on
+trust that it did not matter.
+
 ## K. Benchmark results
 
-**PARTIAL at the time of writing.** The frozen decision rule is applied by
-`scripts/analyse_benchmark.py`; on the cells completed so far:
+**PARTIAL at the time of writing: 15 of 30 preregistered cells.** The frozen
+decision rule is applied by `scripts/analyse_benchmark.py` to the *complete*
+run; nothing below is a verdict. Two families -- `correlated` and `illcond` --
+have no data at all yet, and one of them is the regime the 2023 claim is
+actually about (§B of `TIMELINE.md`).
+
+### K.1 What the certificate says, and why it is the wrong headline
+
+`cg_hist` does not reach a relative duality gap of 1e-6 on any cell measured,
+at any of its three tolerances. **An earlier revision of this section built its
+headline on that sentence, including a "30x to 60x slower ... and short of the
+target" claim. Both are withdrawn.** The multiplier was not supported by any
+recorded number, and the framing measures the wrong thing. Two facts, each
+established after the fact by adversarial review, force the retraction.
+
+**First: the certificate is inert for this arm.** `solve_cg_hist` passes
+`solver_params={}`, replacing the historical MOSEK-only default. MOSEK is not
+licensed here, so the restricted master runs on Clarabel at its *built-in*
+tolerance, and the `tol` the benchmark sweeps reaches only the column
+generation loop's own termination tests. Measured consequence: across the
+sparse family, `cg_hist`'s achieved gap is flat to four significant figures
+over `tol` = 1e-4, 1e-6, 1e-8, while every other arm's moves about five orders
+of magnitude over the same ladder. The floor on `cg_hist`'s certificate is set
+by the harness, not by the method. "It did not reach 1e-6" is therefore partly
+a statement about one line of adapter code, and cannot carry a conclusion.
+
+**Second: the certificate and the answer disagree.** The relative duality gap
+is built by rescaling the residual, making it *first order* in the KKT
+overshoot, while objective suboptimality is *second order*. A solver can fail
+the certificate by a factor of six and still be optimal to eleven significant
+figures. That is exactly what happens:
 
 ```text
-HYP-0001   7 cells support, 0 reject, 0 excluded
-HYP-0005   current scikit-learn reached gap < 1e-8 without hitting max_iter in 7/7
-HYP-0006   REJECTED -- 2 cells recorded a non-zero Lagrangian bound count
+instance                          ratio   cg_hist best gap   objective excess
+historical-n2000-p500             0.1     2.2e-06            +6.3e-13
+historical-n2000-p500             0.5     2.1e-06            +1.2e-12
+sparse-n2000-p500                 0.02    2.5e-06            +1.1e-14
+sparse-n2000-p500                 0.1     6.0e-06            +6.2e-11
+sparse-n2000-p500                 0.5     2.0e-06            +1.1e-11
+sparse-n2000-p5000                0.1     6.0e-05            +3.9e-10
+sparse-n2000-p5000                0.5     1.7e-06            +6.3e-12
+sparse-n500-p5000                 0.02    2.2e-05            +2.1e-11
+sparse-n500-p5000                 0.1     5.2e-06            +1.4e-12
+sparse-n500-p5000                 0.5     6.9e-06            +4.8e-11
+sparse-n10000-p1000               0.02    7.6e-06            +4.9e-11
+sparse-n10000-p1000               0.1     1.1e-05            +7.4e-11
+sparse-n10000-p1000               0.5     5.9e-05            +5.9e-10
+sparse-n2000-p5000                0.02    1.2e-01            +8.8e-04   <-- real failure
 ```
 
-The result is stronger than `HYP-0001` predicted and weaker than `HYP-0006`
-claimed, and both matter.
+On thirteen of fourteen cells the historical method returns an answer matching
+the best any solver found to between 1e-14 and 1e-10. It is not inaccurate. It
+is **slow**, and on one cell it genuinely fails.
 
-**Stronger, and stated more carefully than a first draft of this sentence
-had it.** `cg_hist` does not reach a relative duality gap of 1e-6 in any cell
-measured, at any of its three tolerances. But "never reaches it" reads as a
-catastrophe everywhere and the data does not say that; what it says is two
-different things in two regimes:
+### K.2 The supported headline
 
-```text
-                                        best modern       cg_hist best gap / time
-sparse n=2000 p=500   ratio 0.5         skglm  0.0105 s   2.0e-06 in   0.3 s
-sparse n=2000 p=500   ratio 0.1         skglm  0.0118 s   6.0e-06 in   0.4 s
-sparse n=2000 p=5000  ratio 0.5         celer  0.0910 s   1.7e-06 in   0.6 s
-sparse n=500  p=5000  ratio 0.1         skglm  0.0313 s   5.2e-06 in   1.6 s
-sparse n=2000 p=500   ratio 0.02        sklearn 0.0133 s  2.5e-06 in   6.3 s
-sparse n=500  p=5000  ratio 0.02        skglm  0.1146 s   2.2e-05 in  76.0 s
-sparse n=2000 p=5000  ratio 0.02        skglm  0.2076 s   1.2e-01 in 121.3 s   (hit its limit)
-sparse n=10000 p=1000 ratio 0.5         sklearn 0.1007 s  no result             (timed out)
-```
+Comparing time to a *matched objective* of 1e-6 -- the same shape of rule, with
+the answer in place of the certificate, recorded as post-hoc in `DEC-0001` and
+reported beside the frozen rule, never instead of it:
 
-On easy cells it **stops just short**, at a few times 1e-6, in 0.3–1.6 s —
-30× to 60× slower than the best modern solver and short of the target by a
-factor of two to six. On the sparsest penalties it degrades sharply: 76 s for
-2.2e-05, and 121 s for 0.12, which is its own two-minute limit rather than
-convergence.
+> On the 13 comparable cells measured so far, `cg_hist` is **7.9x to 4530x
+> slower than the best modern solver at a matched objective, median 25.9x.**
+
+| cell | slowdown | `cg_hist` |
+|---|---|---|
+| `historical-n2000-p500` r=0.1 | **4530x** | 68.35 s |
+| `sparse-n500-p5000` r=0.02 | 833x | 75.98 s |
+| `sparse-n2000-p500` r=0.02 | 628x | 6.33 s |
+| `historical-n2000-p500` r=0.5 | 104x | 0.97 s |
+| `sparse-n500-p5000` r=0.1 | 48x | 1.58 s |
+| `sparse-n2000-p500` r=0.1 | 37x | 0.37 s |
+| `sparse-n10000-p1000` r=0.02 | 26x | 2.77 s |
+| `sparse-n2000-p500` r=0.5 | 23x | 0.25 s |
+| `sparse-n10000-p1000` r=0.5 | 22x | 2.06 s |
+| `sparse-n500-p5000` r=0.5 | 18x | 0.51 s |
+| `sparse-n10000-p1000` r=0.1 | 17x | 2.02 s |
+| `sparse-n2000-p5000` r=0.1 | 8.7x | 0.82 s |
+| `sparse-n2000-p5000` r=0.5 | 7.9x | 0.72 s |
+
+This is a weaker claim than "does not reach the target accuracy" and a much
+better supported one. It also survives the inert-ladder problem, because the
+objective is already optimal at the loosest tolerance -- a working ladder could
+only change how long the certificate takes, not the answer that is already
+there.
+
+The two `historical`-family cells are the first data in the regime the 2023
+claim was made in, and they are the *worst* cells for the method, not the best.
+That is the opposite of what §B of `TIMELINE.md` records for the 2023-vs-2023
+comparison, where the method was 2.4x **faster** than its contemporary
+baseline at a matched objective. The difference is not the regime; it is
+sixteen years of working-set solvers. `correlated` and `illcond` remain
+unmeasured and could still move this.
+
+### K.3 The shape of the cost
 
 The pattern is the profile (§I): the cost is the restricted master, the master
 grows with the support, and the sparsest penalty is where the most columns are
-generated before anything settles. Nothing here needs "never" to carry it.
+generated before anything settles. The one outright failure --
+`sparse-n2000-p5000` at ratio 0.02, stopping at a 0.12 gap and an objective
+8.8e-04 high after hitting its own two-minute limit -- is the extreme of that
+same pattern, not a separate phenomenon.
 
-**Weaker:** `HYP-0006` said the method never computes a Lagrangian lower bound
-and the preregistered rule said one non-zero count rejects it. Two cells have
-one. Recorded as a rejection. The reading of the source that motivated it still
-stands and the profiling and adjudication runs did show empty bound lists; the
-hypothesis as *written* is falsified, and rewriting it after the fact is the
-thing preregistration exists to prevent.
+### K.4 Two hypothesis labels that were wrong
+
+Corrected after review; both were reporting errors of mine, not measurements.
+
+- The analysis script printed a block headed `HYP-0005` over a count of how
+  often **current** scikit-learn converges on **2026** instances. `HYP-0005` is
+  about the 2023 runs, and nothing measured here could confirm or deny it. It
+  was settled separately, and **rejected**, by reading the researcher's own
+  committed CSVs (`EVI-0001`): two of its three configurations stopped below
+  `max_iter=1e6`, so they converged, and all three match the CG arm's objective
+  to better than 5e-08.
+- A second block printed `HYP-0006` over a count of recorded Lagrangian bounds.
+  `HYP-0006` is about whether the method *terminates* through the pricing test
+  rather than the dual-stall criterion, which the run detail does not record.
+  **`HYP-0006` is therefore still open**, and an earlier revision of this
+  section calling it "REJECTED -- 2 cells recorded a non-zero Lagrangian bound
+  count" was conflating two different claims.
+
+  The underlying observation is real and is kept as an observation: four runs
+  recorded a bound, every one at `lambda_ratio = 0.5` and `tol = 1e-8`. The
+  boundedness test is `|psi'X| > 2*sqrt(kappa*tau) - cg_lambda_tol` with
+  `tau = kappa = lambda_1/2`, so its threshold grows with the penalty; at a
+  small penalty it fires every iteration and no bound is ever computed, at a
+  large one it need not. This weakens `HYP-0006`'s stated *mechanism* -- that
+  the test always fires -- without settling its termination claim.
 
 ## L. Numerical-stability results
 
@@ -283,12 +411,30 @@ Partly measured, partly inherited.
   solver status `Numerical`, matrix coefficients spanning `[6e-06, 1e+00]` and
   392 dense columns. Preserved in `sources/2023-2025/`, not reproduced (the
   solvers are absent).
-- **The thesis's own conic formulation is the harder of two equivalent
-  models.** `conic_thesis` (`3m+1` variables, `m` rotated cones) reaches a
-  relative gap of 2.8e-06 where `conic_reduced` (`2m+1`, one cone) reaches
-  better, at the same requested tolerance, on the same problem. A cheap,
-  never-tried intervention on the instability the historical material
-  documents at length.
+- **The thesis's own conic formulation is the larger of two equivalent models,
+  and modestly slower -- but not less accurate.** Corrected after review: an
+  earlier revision of this section claimed `conic_thesis` "reaches a relative
+  gap of 2.8e-06 where `conic_reduced` reaches better". That figure has no
+  source in any recorded run, and the comparison it asserts does not hold.
+
+  Measured on six cells (`sparse`, n=300, p=120, k=10, seeds 0 and 1, lambda
+  ratios 0.5 / 0.1 / 0.02, `tol = 1e-8`):
+
+  | comparison | `conic_reduced` better |
+  |---|---|
+  | relative duality gap | **3 / 6** |
+  | objective | **3 / 6** |
+  | wall time | **6 / 6**, median 1.12x, range 1.02x-1.21x |
+
+  On accuracy the two are indistinguishable -- a coin flip, and no basis for
+  calling either the harder model. On time the smaller model wins every cell,
+  which is what its size predicts (`2m+1` variables and one cone against
+  `3m+1` and `m` rotated cones) and is a real if unexciting effect.
+
+  So the surviving claim is narrow: the reformulation is cheaper, by about
+  12%, and does nothing for the numerical instability the historical material
+  documents at length. It is not the cheap fix for that instability that the
+  retracted sentence implied.
 - **An optimality measure that depends on exact zeros silently condemns
   interior-point solvers.** A Clarabel solution whose objective matched LARS to
   seven digits scored a KKT violation of 27.95 against `λ₁ = 27.87`, because
@@ -352,13 +498,13 @@ measured.
 
 | object | status |
 |---|---|
-| `HYP-0001` modern solvers dominate | supported on 7/30 cells; awaiting the full run |
+| `HYP-0001` modern solvers dominate | supported on 15/30 cells; awaiting the full run |
 | `HYP-0002` bounded pricing ≡ dual feasibility | supported, derived and certified on 30 visited duals |
 | `HYP-0003` it is a maximum-violation working-set method | supported by source reading; the trajectory trace the proposal asks for is not run |
 | `HYP-0004` unit-ball value is not a lower bound | first clause proved; existence clause supported on unstandardised data, not observed on standardised |
-| `HYP-0005` the historical baseline did not converge | supported on 7/7 cells |
-| `HYP-0006` termination is never certified | **REJECTED** by its own preregistered rule |
-| `HYP-0007` the pricing scan is not the bottleneck | supported: 0.00 % against 79–99 % |
+| `HYP-0005` the historical baseline did not converge | **REJECTED** (`EVI-0001`): 2 of its 3 configurations stopped below `max_iter`, and all 3 match the CG objective to better than 5e-08 |
+| `HYP-0006` termination is never certified | **still open** — an earlier revision marked it REJECTED on a count of Lagrangian bounds, which is a different claim (§K.4) |
+| `HYP-0007` the pricing scan is not the bottleneck | supported, at a corrected share (§I): the profiler counted one `psi'X` product per iteration where the code performs about two |
 
 Promoting any of these into the capsule is a human act and none has been taken.
 
@@ -370,8 +516,31 @@ whether or not it is fast, and it is not fast.
 
 This is a **successful outcome of the programme**, not a failure of it. The
 brief's outcome D is reached with evidence: a novelty gate that closes on a
-named 2000 paper, and a benchmark in which the method does not reach the
-accuracy its competitors reach in milliseconds.
+named 2000 paper, and a benchmark in which the method is between one and three
+orders of magnitude slower than its competitors at a matched answer.
+
+**The second half of that sentence is a correction.** An earlier revision read
+"a benchmark in which the method does not reach the accuracy its competitors
+reach in milliseconds", and §K.1 now withdraws that framing: on thirteen of
+fourteen measured cells the method's *objective* matches the best any solver
+found to between 1e-14 and 1e-10. It is not inaccurate; it is slow. The
+recommendation is unchanged and its evidential basis is stronger, because
+"7.9x to 4530x slower at a matched objective" does not depend on the duality-gap
+certificate whose ladder §K.1 shows to be inert for this arm.
+
+**What would change this recommendation, and is not yet measured.** Half the
+preregistered cells are outstanding, and two entire families -- `correlated`
+and `illcond` -- have no data. `correlated` is the regime the 2023 claim was
+actually made in, and §B of `TIMELINE.md` records the method beating its
+contemporary baseline there by 2.4x at a matched objective. The two
+`historical`-family cells that have arrived point the other way, hard (4530x
+and 104x), which is why this is a recommendation and not yet a decision. A
+`REJECTS` verdict on the full run would reopen it.
+
+**This recommendation is not the decision.** Under the capsule's own rules a
+Claim is accepted by a human, and none has been; §O records that no Claim
+exists. The gate is `PROP-19700101T000000Z-b9c26fcd` and it is the
+researcher's to decide.
 
 **What is worth keeping.** The equivalence — that the thesis's conic model is
 the LASSO and its pricing-boundedness criterion is the LASSO dual feasibility

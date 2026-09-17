@@ -187,16 +187,42 @@ def test_the_historical_method_stops_short_of_optimality(instance, penalty, refe
     )
 
 
-def test_the_historical_method_never_records_a_lagrangian_bound(instance, penalty):
-    """The lower bound the 2025 notes wanted is never computed under `v_solution`.
+def test_the_lagrangian_bound_is_recorded_only_at_large_lambda(instance):
+    """The lower bound is computed -- rarely, and only when the penalty is large.
 
-    `lagrangian_values` is appended to only on iterations where the Lagrangian
-    model actually ran, and under `v_solution` it runs only when the pricing is
-    bounded -- which, by `HYP-0006`, is never. So the method has no lower bound
-    at all, which is precisely what the 2025 notes say: "in the old version we
-    didn't even have a lower bound".
+    **This test previously asserted "never", and that was wrong.** It was named
+    `test_the_historical_method_never_records_a_lagrangian_bound`, it asserted
+    `== 0`, and it passed only because its fixture sits at `0.15 * lambda_max`.
+    `EXP-0001` then recorded a bound on four cells, every one of them at
+    `lambda_ratio = 0.5` and `tol = 1e-8`, which rejects `HYP-0006` as stated.
+
+    The mechanism is the unboundedness test at `cg_models.py:446`:
+    `|psi'X| > 2*sqrt(kappa*tau) - cg_lambda_tol`. Both `tau` and `kappa` are
+    `lambda_1 / 2`, so the threshold grows with the penalty. At a small penalty
+    it is cleared on every iteration, the Lagrangian model is skipped, and no
+    bound exists. At a large one the test can fail to trigger, the model runs,
+    and a bound is recorded.
+
+    So the 2025 note "in the old version we didn't even have a lower bound" is
+    right about the regime it was written in and wrong as a universal. The test
+    now pins both sides of the boundary rather than the convenient side.
     """
 
     X, y = instance
-    found = REGISTRY["cg_hist"](X, y, penalty, tol=1e-8, time_limit_minutes=2.0)
-    assert found.detail["lagrangian_values_recorded"] == 0
+    ceiling = lambda_max(X, y)
+
+    weak = REGISTRY["cg_hist"](
+        X, y, Penalty(lambda_1=0.15 * ceiling), tol=1e-8, time_limit_minutes=2.0
+    )
+    assert weak.detail["lagrangian_values_recorded"] == 0, (
+        "at a small penalty the pricing is unbounded on every iteration and the "
+        "Lagrangian model never runs"
+    )
+
+    strong = REGISTRY["cg_hist"](
+        X, y, Penalty(lambda_1=0.7 * ceiling), tol=1e-8, time_limit_minutes=2.0
+    )
+    assert strong.detail["lagrangian_values_recorded"] >= 1, (
+        "at a large penalty the method does compute a Lagrangian lower bound, "
+        "which is what rejects HYP-0006"
+    )

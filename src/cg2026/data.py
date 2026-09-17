@@ -97,12 +97,27 @@ def build(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray | None
     return np.ascontiguousarray(X), np.ascontiguousarray(y), truth
 
 
-def _historical(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _historical(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, None]:
     """`synthetic_data.py::original_data_generation`, as it is written.
 
     Including the part that matters: `betas` is drawn over every column and `y`
-    is formed *before* the noise columns are overwritten, so the truth is dense
-    and the overwritten columns are uninformative rather than zero-coefficient.
+    is formed *before* the noise columns are overwritten.
+
+    **There is no ground-truth coefficient vector here, so none is returned.**
+    An earlier version returned the drawn `beta` with the overwritten entries
+    zeroed, and an adversarial review was right to call it inconsistent with
+    `y`. It is not a near-miss. `y` was formed from the pre-overwrite columns,
+    so after the overwrite the vector explains a relative residual of
+    **0.78** at `n=2000, p=500, noise_fraction=0.1` -- it accounts for
+    essentially none of `y` -- while carrying 450 of 500 nonzeros. Feeding that
+    to `bench._support_scores` compares a 25-feature LASSO solution against a
+    450-nonzero fiction and reports a recall near zero for every solver, which
+    says nothing about any of them.
+
+    Returning `None` is the honest encoding: `build` already declares the truth
+    optional, and `bench` already skips the support scores when it is absent.
+    `X` and `y` are untouched, because reproducing the historical generator is
+    the entire point of this family.
     """
 
     rng = np.random.default_rng(spec.seed)
@@ -118,9 +133,7 @@ def _historical(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     if n_noise:
         noise_cols = rng.choice(spec.p, n_noise, replace=False)
         X[:, noise_cols] = rng.normal(0, 1, (spec.n, n_noise))
-        beta = beta.copy()
-        beta[noise_cols] = 0.0  # they no longer explain y
-    return X, y, beta
+    return X, y, None
 
 
 def _sparse(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -135,7 +148,7 @@ def _sparse(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return X, signal + noise, beta
 
 
-def _correlated(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _correlated(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, None]:
     """`synthetic_data.py::correlated_data_generation`, without the O(p^2) loop.
 
     The historical code builds the covariance with a Python double loop and then
@@ -143,8 +156,19 @@ def _correlated(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     equicorrelated matrix -- `cov(i,j) = s_i s_j rho`, `cov(i,i) = s_i^2` --
     factorises in closed form: with `z` and `w` standard normal,
     `sqrt(rho) w + sqrt(1 - rho) z_j`, scaled by `s_j`, has exactly that
-    covariance. Same distribution, same seed semantics, seconds instead of hours
-    at p = 5000.
+    covariance. Seconds instead of hours at p = 5000.
+
+    **Same distribution, NOT the same draw.** An earlier version of this
+    docstring claimed "same seed semantics", which is false and was caught in
+    review: `multivariate_normal` consumes the generator stream in a different
+    order and quantity than the closed-form factorisation, so the same seed
+    produces a different `X`. What is preserved is the law, not the sample.
+    Nothing here reproduces a specific historical instance; for that, see
+    :func:`load_historical_artifact`.
+
+    As in :func:`_historical`, no ground truth is returned -- `y` is formed
+    before the noise columns are overwritten, leaving the drawn coefficients
+    explaining a relative residual of 0.26 at `n=2000, p=500, rho=0.5`.
     """
 
     if not 0.0 <= spec.rho < 1.0:
@@ -161,9 +185,7 @@ def _correlated(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     if n_noise:
         noise_cols = rng.choice(spec.p, n_noise, replace=False)
         X[:, noise_cols] = rng.normal(0, 1, (spec.n, n_noise))
-        beta = beta.copy()
-        beta[noise_cols] = 0.0
-    return X, y, beta
+    return X, y, None
 
 
 def _illcond(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

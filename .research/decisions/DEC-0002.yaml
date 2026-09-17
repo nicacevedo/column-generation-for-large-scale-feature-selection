@@ -1,0 +1,27 @@
+id: DEC-0002
+type: decision
+schema_version: 1
+status: accepted
+title: Restore time_to_target to the frozen loosest-tolerance rule
+statement: >-
+  scripts/analyse_benchmark.py::time_to_target is corrected to select the
+  loosest tolerance that reaches the target gap, as EXP-0001's manifest
+  specifies, rather than the fastest among all qualifying tolerances.
+rationale: >-
+  The implementation had looped over every qualifying tolerance and kept the
+  minimum wall time. That is per-solver best-case selection and it is not the
+  rule that was frozen. An adversarial review measured the effect: 10 of 40
+  (cell, solver) pairs changed, by up to 1.82x, and every change lowered the
+  reported time in the direction that favours the stated conclusion. The rule
+  is restored rather than amended because the deviation was found after results
+  existed.
+alternatives_considered:
+  - >-
+    Amend the manifest to define the metric as the fastest qualifying
+    tolerance, matching the shipped code. Rejected: the results were already
+    in hand, the change favours the stated conclusion, and rewriting a frozen
+    rule to match an implementation bug is indistinguishable from choosing the
+    endpoint after seeing the data.
+  - >-
+    Report both selections. Rejected as noise: the frozen rule is the decision
+    rule, and the alternative has no independent scientific meaning.

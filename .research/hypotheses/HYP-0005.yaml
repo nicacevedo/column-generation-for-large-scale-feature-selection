@@ -1,7 +1,7 @@
 id: HYP-0005
 type: hypothesis
 schema_version: 1
-status: active
+status: rejected
 title: The historical baseline did not converge
 statement: >-
   The scikit-learn coordinate-descent baseline underlying the historical speed
@@ -14,6 +14,29 @@ falsification: >-
   figures.
 addresses:
   - Q-0001
+contrary_evidence:
+  - EVI-0001
 assumptions:
   - ASM-0001
   - ASM-0002
+retire_reason: >-
+  REJECTED by direct inspection of the researcher's own committed 2023
+  results, not by new measurement. The statement asserts that the recorded
+  iteration counts "reach and equal max_iter". With the cap at max_iter=1e6
+  (models.py:99), only one of the three configurations behind the historical
+  speed claim did so: correlated_data tau_exp=2, at 1000000. The other two
+  stopped below the cap -- correlated_data tau_exp=1 at 217912 and real_data2
+  tau_exp=3 at 73363 -- which for scikit-learn's coordinate descent means its
+  own duality-gap test was satisfied. They converged.
+
+  The objectives corroborate this. At tau_exp=1, SCIKIT_LASSO records
+  fo_value=9.962080731336979 against CG_LASSO_SOC1_v2's 9.962080551706714, a
+  relative difference of 1.8e-08; even the capped tau_exp=2 row agrees to
+  4.9e-08. The 2023 baseline was returning the correct answer.
+
+  The consequence is that the 2023 timing comparison is NOT explained away as
+  a non-converged baseline, and at tau_exp=1 the historical method was 2.4x
+  faster (0.449 min vs 1.068 min) at a matched objective. Whether that
+  survives against 2026 working-set solvers is what EXP-0001's correlated and
+  historical families measure; the sparse-family cells reported so far say
+  nothing about it. See docs/2026/TIMELINE.md section B.

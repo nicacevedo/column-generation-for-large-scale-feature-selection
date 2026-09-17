@@ -203,22 +203,48 @@ clf = Lasso(alpha=tau/n, fit_intercept=False, max_iter=1/tol, tol=tol)
 `α = τ/n`. Checked; it is right, and it is the first thing that would have
 invalidated everything.
 
-What the committed result files show instead is a baseline that is not
-converging:
+What the committed result files show is a baseline that is **slow, and -- in
+two of three configurations -- converged**:
 
-| file | n | m | λ scale | `SCIKIT_LASSO` time | `n_iter_` |
-|---|---|---|---|---|---|
-| `method-benchmark/…correlated_data.csv` | 1000 | 500 | `tau_exp=1` | 1.07 min | **217 912** |
-| `method-benchmark/…correlated_data.csv` | 1000 | 500 | `tau_exp=2` | 5.61 min | **1 000 000** (= `max_iter`) |
-| `method-benchmark/…real_data2.csv` | 10000 | 100 | `tau_exp=3` | 0.72 min | **73 363** |
+| file | n | m | λ scale | `SCIKIT_LASSO` time | `n_iter_` | hit `max_iter`? |
+|---|---|---|---|---|---|---|
+| `method-benchmark/…correlated_data.csv` | 1000 | 500 | `tau_exp=1` | 1.07 min | 217 912 | no |
+| `method-benchmark/…correlated_data.csv` | 1000 | 500 | `tau_exp=2` | 5.61 min | **1 000 000** | **yes** |
+| `method-benchmark/…real_data2.csv` | 10000 | 100 | `tau_exp=3` | 0.72 min | 73 363 | no |
 
-Times are minutes (`models.py` returns `(t1-t0)/60`). A LASSO with **m = 100**
-needing 73 363 coordinate-descent passes, and one with m = 500 hitting
-`max_iter` exactly, are not measurements of coordinate descent's speed; they
-are measurements of a solver that did not reach its tolerance. The `tau_exp`
-sweep drives `λ = 2·error_quad_OLS/m^{tau_exp}` toward zero — at `tau_exp=2`,
-`τ = 3.6e-05` — which is the regime where the LASSO is nearly OLS, the solution
-is nearly dense, and plain cyclic CD is at its worst.
+Times are minutes (`models.py` returns `(t1-t0)/60`); the cap is `max_iter=1e6`
+(`models.py:99`).
+
+**An earlier revision of this file called all three rows "a solver that did not
+reach its tolerance". That was wrong, and an adversarial review caught it.**
+Only the `tau_exp=2` row hit the cap. The other two stopped *below* it, which
+for scikit-learn's coordinate descent means its own duality-gap test was
+satisfied -- they converged. The claim is retracted.
+
+Worse for the retracted reading: the objectives agree. On the same
+`tau_exp=1` row, `SCIKIT_LASSO` reports `fo_value = 9.962080731336979` and
+`CG_LASSO_SOC1_v2` reports `9.962080551706714` -- a relative difference of
+**1.8e-08**. Even the capped `tau_exp=2` row agrees to **4.9e-08**. Whatever
+else was happening, the 2023 baseline was returning the right answer.
+
+So the 2023 timing comparison is **not** invalidated by non-convergence, and
+the honest reading of that row is the uncomfortable one:
+
+> at `tau_exp=1`, `CG_LASSO_SOC1_v2` took **0.449 min** against
+> `SCIKIT_LASSO`'s **1.068 min** at an objective matched to 1.8e-08. In the
+> correlated regime the method was designed for, the 2023 method was
+> **2.4x faster** than the 2023 baseline.
+
+That is a real datapoint in the historical method's favour, it is recorded
+here because it is in the researcher's own committed results, and it is
+exactly the regime `EXP-0001`'s `correlated` and `historical` families exist
+to re-measure against 2026 working-set solvers. Nothing in the `sparse`-family
+numbers reported in `SCIENTIFIC_REPORT.md` §K speaks to it.
+
+What remains true is narrower: cyclic coordinate descent is at its worst here.
+The `tau_exp` sweep drives `λ = 2·error_quad_OLS/m^{tau_exp}` toward zero -- at
+`tau_exp=2`, `τ = 3.6e-05` -- which is the nearly-OLS, nearly-dense regime, and
+the one configuration that did hit the cap is the one with the smallest λ.
 
 And in the one committed regime with `p > n`:
 
@@ -292,9 +318,35 @@ n = 10000, m = 1000, MOSEK, identical instance and parameters:
 | `unit_ball` (2025) | 1.010 | 74 | 135 | 8832.4685 |
 | `negative_gradient` (2025) | 1.006 | 72 | 135 | 8832.4685 |
 
-Times in minutes. **Both 2025 pricing ideas are ~4× slower than the 2023
-method they were meant to improve, on the author's own instance**, and reach the
-same objective.
+Times in minutes. **Both 2025 pricing ideas are at least 3.8× slower than the
+2023 method they were meant to improve, on the author's own instance**, and
+reach the same objective.
+
+**The two 2025 times are censored, and the `converged` column is meaningless.**
+Corrected after review. `new_main.py:28` sets `time_limit = 1` minute, and
+`cg_models.py:142` breaks the column generation loop as soon as elapsed time
+passes it. Both 2025 rows sit just *past* that cap -- 1.0103 and 1.0057 minutes
+-- so both were truncated mid-solve, and their wall times are **lower bounds**
+on what the policies would have taken to finish. The `status` column says
+`converged` for all three rows, but that string is a hardcoded literal written
+unconditionally at `new_main.py:373`; it records nothing about how any run
+ended.
+
+Two consequences, in opposite directions:
+
+- The multiplier is not "~4x". It is **"at least 3.8x"** (1.0057 / 0.2624 and
+  1.0103 / 0.2624), with no upper bound available from this data. The
+  conclusion that the 2025 ideas are worse is *strengthened* by the censoring,
+  not weakened -- but the specific figure was never measurable and is
+  withdrawn.
+- The comparison rests on **n = 1** per policy, on a single instance, with no
+  repetition and no variance estimate. Whatever it supports, it does not
+  support a precise ratio.
+
+What survives is the qualitative ordering, which the censoring makes safe:
+`v_solution` finished in 0.262 min while both 2025 policies were still running
+at 1.0 min, all three at objectives agreeing to about 1e-9.
+
 
 The note's own reading agrees: *"The unit ball method (analogous behavior as
 minus gradient) have a faster approach to the optimal value, but then it starts

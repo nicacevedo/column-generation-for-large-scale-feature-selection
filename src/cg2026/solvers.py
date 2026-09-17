@@ -310,6 +310,34 @@ def solve_cg_hist(
                 tau,
                 kappa,
                 solver=cp.CLARABEL,
+                # **This makes `tol` partly inert, and the benchmark's primary
+                # metric inherits the consequence. Read before interpreting a
+                # cg_hist number.**
+                #
+                # The historical signature defaults to
+                # `{'mosek_params': {'MSK_DPAR_INTPNT_CO_TOL_REL_GAP': 1e-6}}`
+                # (`src/cg_models.py:50`), which is a MOSEK-only dict and is
+                # ignored by every other solver. MOSEK is not licensed here, so
+                # the arm runs on Clarabel and the dict is replaced with `{}`
+                # rather than passed through as a no-op that reads like a
+                # setting.
+                #
+                # The effect is that `tol` below reaches only the column
+                # generation loop's own termination tests. It never reaches the
+                # accuracy of the restricted master's conic solve, which stays
+                # at Clarabel's built-in default no matter what is requested.
+                # Measured: across the sparse family, cg_hist's achieved
+                # relative gap is flat to four significant figures over
+                # tol = 1e-4, 1e-6, 1e-8, while every other arm's moves by
+                # about five orders of magnitude over the same ladder.
+                #
+                # So the floor on cg_hist's certificate is set by the harness,
+                # not by the method, and "cg_hist did not reach 1e-6" is partly
+                # a statement about this line. Objective excess is unaffected
+                # and is the metric to compare on (DEC-0001). A ladder that
+                # actually moves needs `{'tol_gap_rel': tol, 'tol_feas': tol}`
+                # here, which changes the measurement and therefore belongs in
+                # a newly preregistered experiment, not in EXP-0001.
                 solver_params={},
                 solver_verbose=False,
                 add_constant=False,

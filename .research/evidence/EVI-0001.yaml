@@ -1,0 +1,34 @@
+id: EVI-0001
+type: evidence
+schema_version: 1
+status: active
+title: Historical scikit-learn iteration counts do not equal max_iter
+kind: other
+locator: >-
+  results/method-benchmark/main_methods_benchmark_correlated_data.csv;
+  results/method-benchmark/main_methods_benchmark_real_data2.csv;
+  src/models.py:99
+statement: >-
+  Inspection of the committed 2023 benchmark CSVs, against the iteration cap
+  max_iter=1e6 set at models.py:99, shows that two of the three SCIKIT_LASSO
+  configurations behind the historical speed claim stopped strictly below the
+  cap: correlated_data at tau_exp=1 with k_iter=217912, and real_data2 at
+  tau_exp=3 with k_iter=73363. Only correlated_data at tau_exp=2 reached
+  1000000. For scikit-learn's coordinate descent, stopping below max_iter
+  means the duality-gap stopping test was satisfied.
+
+  The recorded objectives agree with the column-generation arm on the same
+  rows. At tau_exp=1, SCIKIT_LASSO fo_value=9.962080731336979 against
+  CG_LASSO_SOC1_v2 fo_value=9.962080551706714, a relative difference of
+  1.8e-08. At the capped tau_exp=2 row the two agree to 4.9e-08.
+
+  This is inspection of pre-existing committed artifacts, not new measurement.
+  It contradicts HYP-0005, whose statement asserts that the recorded counts
+  "reach and equal max_iter".
+notes: >-
+  Derived by reading the researcher's own 2023 committed result files; no new
+  computation was performed and no historical file was modified. Reproduce
+  with: python -c "import csv;
+  rows=list(csv.DictReader(open('results/method-benchmark/main_methods_benchmark_correlated_data.csv')));
+  print([(r['model'], r['tau_exp'], r['k_iter'], r['fo_value']) for r in rows
+  if r['n_row']=='1000' and r['m_col']=='500'])"
