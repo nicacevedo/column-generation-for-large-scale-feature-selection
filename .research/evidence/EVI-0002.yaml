@@ -21,7 +21,7 @@ statement: >-
   Secondary and explicitly post-hoc (DEC-0001), time to a matched objective of
   1e-6 on the 26 comparable cells: cg_hist is between 7.9x and 4530x slower
   than the best modern arm, median 38.7x. On 26 of 30 cells cg_hist's objective
-  matches the best any arm reached to between 1e-14 and 1e-10 while failing the
+  matches the best any arm reached to between 1.1e-14 and 5.9e-10 while failing the
   1e-6 duality-gap certificate; on 4 it fails outright, with objective excesses
   of 2.3e-04, 8.8e-04, 1.7e-01 and 9.4e-01 after exhausting the time limit.
 

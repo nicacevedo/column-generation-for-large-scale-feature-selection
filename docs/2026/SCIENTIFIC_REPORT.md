@@ -363,7 +363,7 @@ sparse      n2000-p5000                   0.02   gap 0.12, 121.3 s  +8.8e-04
 ```
 
 On **26 of 30** cells the historical method returns an answer matching the best
-any solver found to between 1e-14 and 1e-10, most of them while *failing* the
+any solver found to between 1.1e-14 and 5.9e-10, most of them while *failing* the
 1e-6 certificate. It is not inaccurate. It is **slow**.
 
 On the remaining **four** it genuinely fails, and they are not scattered: three
@@ -609,7 +609,7 @@ orders of magnitude slower than its competitors at a matched answer.
 "a benchmark in which the method does not reach the accuracy its competitors
 reach in milliseconds", and §K.1 now withdraws that framing: on thirteen of
 fourteen measured cells the method's *objective* matches the best any solver
-found to between 1e-14 and 1e-10. It is not inaccurate; it is slow. The
+found to between 1.1e-14 and 5.9e-10. It is not inaccurate; it is slow. The
 recommendation is unchanged and its evidential basis is stronger, because
 "7.9x to 4530x slower at a matched objective" does not depend on the duality-gap
 certificate whose ladder §K.1 shows to be inert for this arm.
