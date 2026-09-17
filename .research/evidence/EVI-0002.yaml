@@ -30,7 +30,14 @@ statement: >-
   tolerance (1e-8) and none is in the sparse family.
 
   The correlated family, the regime the 2023 speed claim was made in, does not
-  favour the method: 28x to 818x slower at a matched objective.
+  favour the method: 28x to 818x slower at a matched objective, median 37x.
+  Per-family medians are historical 269x (n=3), illcond 91x (n=6), correlated
+  37x (n=6) and sparse 23x (n=11), so the method does worst on the dense-truth
+  historical family and best on sparse, the one regime the historical work
+  never tested.
+
+  cg_hist reached the 1e-6 certificate on 5 of 30 cells, all outside the
+  sparse family.
 notes: >-
   This records what the run produced. It is not a Claim and no Claim has been
   accepted; per the capsule's own rules that is a human act. Reproduce with

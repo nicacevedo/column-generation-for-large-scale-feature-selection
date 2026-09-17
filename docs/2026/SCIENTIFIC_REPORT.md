@@ -306,13 +306,34 @@ and `correlated` is the regime the 2023 claim was actually made in (§B of
 `TIMELINE.md`). **It does not rescue the method.** On
 `correlated-n2000-p500-rho0.5` at ratio 0.1, LARS finishes in 0.030 s against
 `cg_hist`'s 3.78 s at an objective matched to 1.3e-13; at ratio 0.02 the same
-comparison is 0.104 s against 84.9 s. The regime that produced the historical
-claim is where the gap is widest, not narrowest.
+comparison is 0.104 s against 84.9 s.
+
+Per-family median slowdown at a matched objective, which is the comparison that
+actually answers "does the regime matter":
+
+| family | cells | median | min | max |
+|---|---|---|---|---|
+| `historical` | 3 | **269x** | 104x | 4530x |
+| `illcond` | 6 | 91x | 12x | 157x |
+| `correlated` | 6 | 37x | 28x | 818x |
+| `sparse` | 11 | 23x | 7.9x | 833x |
+
+The method does *worst* on the dense-truth `historical` family and *best* on
+`sparse`, the one regime the historical work never tested. So the regime does
+matter, and it matters in the direction that is unhelpful to the 2023 claim.
 
 ### K.1 What the certificate says, and why it is the wrong headline
 
-`cg_hist` does not reach a relative duality gap of 1e-6 on any cell measured,
-at any of its three tolerances. **An earlier revision of this section built its
+`cg_hist` reaches a relative duality gap of 1e-6 on **5 of 30** cells, at any
+of its three tolerances -- `correlated-rho0.5` r=0.1, `correlated-rho0.9` r=0.1
+and r=0.5, `historical-n10000-p1000` r=0.5, and `illcond-cond1e5` r=0.02.
+
+(An earlier revision of this paragraph said it reached the target on *no* cell.
+That was true of the sparse-only partial run this section was first drafted
+against and is false of the complete one; the five cells above are all outside
+the `sparse` family.)
+
+**An earlier revision of this section built its
 headline on that sentence, including a "30x to 60x slower ... and short of the
 target" claim. Both are withdrawn.** The multiplier was not supported by any
 recorded number, and the framing measures the wrong thing. Two facts, each
