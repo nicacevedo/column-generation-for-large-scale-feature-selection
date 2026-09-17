@@ -89,7 +89,7 @@ default argument are the 2025 code.
 | the poster's Figures 1–4 | **cannot be attempted** | MOSEK, and the data |
 | the whiteboard's solver comparison (Fig. p.9) | **cannot be attempted** | seven of eight solvers absent |
 | running the 2025 method at all, on new data | **PARTIAL_REPRODUCTION** | Clarabel for MOSEK; numpy 2 / cvxpy 1.9 for numpy 1 / cvxpy 1.3; the 46-line compatibility diff |
-| the *behaviour* the historical notes describe — dual stall, no lower bound, master growth | **PARTIAL_REPRODUCTION, and it reproduces** | see §4 |
+| the *behaviour* the historical notes describe — dual stall, master growth, and the missing lower bound *at a small penalty* | **PARTIAL_REPRODUCTION, and it reproduces** | see §4; the "no lower bound" clause is regime-dependent and an earlier revision stated it as a universal |
 
 There is no `ORIGINAL_REPRODUCTION` row and there cannot be one on this host.
 

@@ -649,19 +649,38 @@ benchmark and an independent review. Nothing has. `docs/2026/` is the
 
 ## R. Remaining scientific questions
 
-1. **Finish `EXP-0001`.** 7 of 30 cells. The rule is frozen and coded.
-2. **Run the working-set trajectory trace** the autonomous proposal specifies
+1. ~~**Finish `EXP-0001`.**~~ **Done: 30 of 30 cells** (`EVI-0002`). The frozen
+   rule returns SUPPORTED for `HYP-0001` on every cell.
+2. **Give `cg_hist` a tolerance ladder that moves, and re-measure.** The
+   adapter passes `solver_params={}`, pinning the restricted master at
+   Clarabel's default accuracy, so the preregistered certificate metric cannot
+   distinguish the method's own settings (§K.1). The fix is
+   `{'tol_gap_rel': tol, 'tol_feas': tol}`, it changes the measurement, and it
+   therefore needs its own preregistration. Note what §K.5 implies about the
+   likely outcome: the seven runs that failed outright were all at the tightest
+   tolerance, so asking the master for more accuracy is already what breaks it.
+3. **Settle `HYP-0006`.** It is open, not rejected -- the earlier rejection was
+   a mislabel (§K.4). Settling it needs the run detail to record *why* the loop
+   stopped, which it currently does not: dual-stall, no new column, pricing
+   certificate, time limit. A one-field change to `solve_cg_hist`'s detail dict
+   and a re-run would answer it.
+4. **Run the working-set trajectory trace** the autonomous proposal specifies
    (its PR-006). It converts the novelty gate from a literature argument into a
    round-by-round measurement, and it is the one experiment that could falsify
    `HYP-0003` and reopen `Q-0004`.
-3. **Re-measure with the 2025 driver's settings** (`pos_linear_comb=True`,
+5. **Re-measure with the 2025 driver's settings** (`pos_linear_comb=True`,
    `v = v0 = max(int(m·0.012), 5)`), separately preregistered. Nothing here
    reproduces the committed 2025 numbers, and the difference is 4–7× in
    iterations.
-4. **Real data.** None was used. The historical real data is gone and OpenML
+6. **Real data.** None was used. The historical real data is gone and OpenML
    was unreachable within budget. `Q-0009` is untouched.
-5. **`Q-0007`, the numerical instability**, has one new datum (the thesis's
-   conic form is the harder of two equivalent models) and no ablation.
-6. **The ℓ0 track** was declared out of scope by §T0 and that should be
+7. **`Q-0007`, the numerical instability**, now has a real datum and it is not
+   the one this section used to cite. The claim that the thesis's conic form is
+   "the harder of two equivalent models" is withdrawn (§L): measured, the
+   reduced model is 3/6 on gap, 3/6 on objective and 6/6 on time at a median
+   1.12x -- cheaper, not more stable. The new datum is §K.5: seven restricted
+   master solves raised outright, all at `tol = 1e-8`, none in the `sparse`
+   family. Still no ablation.
+8. **The ℓ0 track** was declared out of scope by §T0 and that should be
    revisited only if someone intends to apply the decomposition to `MIQP`,
    which nobody has.
