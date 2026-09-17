@@ -1,0 +1,154 @@
+id: EXP-0001
+type: experiment
+schema_version: 1
+status: specified
+title: Does the historical CG speed regime survive modern LASSO solvers?
+purpose: >-
+  The first falsification question. The 2023 poster claims the decomposition
+  method is fastest when between roughly 75 features and 40 % of the feature
+  count are non-zero, measured against scikit-learn coordinate descent and
+  monolithic conic solves. Every modern working-set and screening solver
+  post-dates that comparison, and docs/2026/TIMELINE.md §B records that the
+  baseline it rests on reached max_iter rather than its tolerance. This
+  experiment settles HYP-0001 by measuring, on a frozen grid at matched
+  objective and matched accuracy, whether any regime remains in which the
+  column-generation method is faster than the best available solver.
+hypotheses:
+  - HYP-0001
+  - HYP-0005
+  - HYP-0006
+predictions:
+  - hypothesis: HYP-0001
+    predicted_outcome: >-
+      [PRESPECIFIED] In every one of the 30 (instance, lambda) cells, the
+      minimum over {celer, skglm, sklearn, lars} of the median wall time to
+      reach a relative duality gap of 1e-6 is strictly less than the
+      column-generation method's. HYP-0001 survives if that holds in all 30
+      cells; it is falsified by one cell in which cg_hist is faster at that
+      accuracy.
+    discriminates: true
+  - hypothesis: HYP-0005
+    predicted_outcome: >-
+      [PRESPECIFIED] Current scikit-learn, at tol 1e-10 with max_iter 1e6,
+      reaches a relative duality gap below 1e-8 on every cell without reaching
+      max_iter. If the historical iteration counts (217912, 1000000, 73363)
+      were a property of coordinate descent rather than of a non-converged run,
+      the same solver on comparable instances would reach max_iter here too.
+    discriminates: true
+  - hypothesis: HYP-0006
+    predicted_outcome: >-
+      [PRESPECIFIED] In every cell where cg_hist returns status ok, the
+      relative duality gap it attains is at least 100x larger than the best
+      solver's on the same cell, and its recorded count of Lagrangian bound
+      evaluations is zero -- because its pricing test never reports bounded, so
+      the Lagrangian model never runs and no lower bound is ever computed.
+    discriminates: true
+primary_metrics:
+  - median_wall_seconds_to_relative_gap_1e-6
+  - relative_duality_gap_attained
+  - peak_rss_mib
+decision_rule: >-
+  [PRESPECIFIED] Let T(s, c) be the median wall time of solver s on cell c over
+  its repetitions at the loosest tolerance whose median attained relative
+  duality gap is at most 1e-6; T(s, c) is undefined if no tolerance reaches it.
+  Let M(c) be the minimum of T over {celer, skglm, sklearn, lars}.
+
+  HYP-0001 is SUPPORTED if T(cg_hist, c) is undefined or T(cg_hist, c) > M(c)
+  in all 30 cells. It is REJECTED if there is at least one cell with
+  T(cg_hist, c) <= M(c). If it is rejected, the cells where it is rejected
+  define the surviving regime and are reported as such rather than as noise.
+
+  HYP-0005 is SUPPORTED if scikit-learn at tol 1e-10 attains a relative gap
+  below 1e-8 in at least 27 of the 30 cells without its reported iteration
+  count reaching 1e6. It is REJECTED if it reaches 1e6 iterations in more than
+  3 cells, which would make the historical counts a property of the solver
+  rather than of the configuration.
+
+  HYP-0006 is SUPPORTED if cg_hist's recorded Lagrangian-bound count is zero in
+  every cell where it returns status ok. A single cell with a non-zero count
+  rejects it.
+
+  A cell in which cg_hist times out at 600 s counts as T undefined, which
+  supports HYP-0001. A cell in which a modern solver errors or times out counts
+  as its T undefined and is excluded from M(c) for that cell; if all four are
+  undefined the cell is excluded from the HYP-0001 tally and reported
+  separately.
+notes: >-
+  FROZEN BEFORE EXECUTION. Rests on ASM-0001 (objective convention), ASM-0002
+  (no MOSEK here) and ASM-0003 (single host, thread-controlled, no asymptotic
+  claim). Secondary metrics recorded but not decision-bearing: median CPU
+  seconds, KKT violation, support recall and precision, non-zero count, CG
+  iterations, CG columns generated. The grid is experiments/EXP-0001-plan.json,
+  plan digest 8e42f3ecd71f4aaf34784283773b70ce4c3fa7f62f2fd58c83908919c054f141,
+  file sha256 2c18b7c9c4fc7921bec1e74d982a52a5c7c01d1f2b8c2c547583381144b46a1a.
+  Nothing in the grid, the tolerances, the repetitions, the timeout or the
+  metrics may change after the first result exists without a recorded Decision.
+
+  DESIGN, as the brief's §21 asks it to be stated.
+
+  Ten instances. Four `sparse` (genuinely sparse truth, k=25, SNR 5) at
+  (n,p) = (2000,500), (2000,5000), (500,5000), (10000,1000), so both n>p and
+  p>n are covered and the last is the historical headline scale. Two
+  `historical`, reproducing synthetic_data.py's generator at (2000,500) and
+  (10000,1000) -- these have a DENSE ground truth, which is what that generator
+  produces and which is why the historical claim is about the 40 %-non-zero
+  regime. Two `correlated` at rho 0.5 and 0.9, the historical stress case. Two
+  `illcond` with Gram condition numbers 1e6 and 1e10, which the historical work
+  never tried and which the brief asks for.
+
+  Three penalty levels per instance: lambda_1 = ratio * lambda_max with ratio in
+  {0.5, 0.1, 0.02}. Scaled to lambda_max rather than fixed absolutely, so the
+  same ratio means comparable sparsity across instances whose units differ.
+
+  X is dense in every instance. Every instance is column-standardised and the
+  response is standardised, which is what new_main.py does and what the
+  whiteboard found helped the conic solves.
+
+  Threads are pinned to 1 in the environment of a fresh process before numpy
+  loads: OMP, OPENBLAS, MKL, NUMEXPR, VECLIB and RAYON. Clarabel is Rust and
+  respects RAYON_NUM_THREADS. The historical timings were taken with
+  MSK_IPAR_NUM_THREADS = cpu_count() against a single-threaded scikit-learn.
+
+  Seven arms. celer, skglm, scikit-learn and LassoLars are the modern
+  baselines. conic_reduced and conic_thesis are the two conic formulations of
+  the same problem, included because the 2023 comparison included a monolithic
+  conic solve and because the thesis's three-block form is a materially
+  different thing for a solver to see. cg_hist is the 2025 code itself, through
+  src/cg2026/cg_hist_compat.py, with a compatibility diff of 46 lines that is
+  recorded in that file's header and changes no arithmetic.
+
+  Each arm runs a ladder of its own tolerances, because no two of these solvers
+  mean the same thing by tol. Time-to-accuracy is read off the resulting curve
+  rather than decided by the configuration.
+
+  Repetitions: 3 for the fast deterministic-per-tolerance arms, 1 for
+  conic_reduced, conic_thesis and cg_hist. Repeating a 200-second conic solve
+  measures the machine's variance, not the method's.
+
+  Timeout: 600 s per (instance, lambda, arm) cell, enforced on the process.
+  cg_hist additionally carries the historical code's own 2-minute internal
+  limit. Memory is recorded as peak RSS per cell; there is no memory limit,
+  because a solver killed for memory and a solver that swaps produce different
+  and equally interesting failures and neither should be hidden.
+
+  FAILURE AND EXCLUSION POLICY, frozen. A cell that times out is recorded with
+  status `timeout` and its time is undefined, not infinite and not dropped. A
+  solver that raises is recorded with the exception type. cg_hist returning
+  None -- its own "Primal-Dual gap is too big, no dual solution" path -- is
+  recorded as status no_dual_solution and counted as a failure of the method,
+  not as a missing measurement. No cell is rerun to get a better number.
+
+  REAL DATA is not in this experiment. The historical real-data directories are
+  in .gitignore and are not on this machine, and usa.csv -- which is committed
+  -- is a scraped list of ticker symbols, not a regression matrix. The one
+  surviving historical artifact, synthetic-data-error/ (X 10000x1000, 20 %
+  noise columns), and any external benchmark dataset belong to a separate
+  preregistered experiment so that this one's grid stays frozen while their
+  availability is established.
+
+  WHAT THIS EXPERIMENT CANNOT SETTLE. It is one host, one thread count, one
+  conic solver and finite instance sizes, so it cannot support any claim about
+  asymptotic scaling (ASM-0003) and it cannot reproduce a MOSEK timing
+  (ASM-0002). A result showing the modern solvers faster everywhere here does
+  not establish that no implementation of this method could be competitive; it
+  establishes that this one is not, which is what HYP-0001 says.

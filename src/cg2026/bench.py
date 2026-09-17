@@ -47,6 +47,11 @@ class Arm:
     solver: str
     tolerances: tuple[float, ...]
     options: dict[str, Any] = field(default_factory=dict)
+    repetitions: int | None = None
+    """Overrides the plan's. One is honest for a deterministic, slow solver:
+    repeating a conic solve three times measures the machine's variance, not
+    the method's, and spends the budget that the fast solvers' repetitions
+    actually need."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +96,7 @@ class Plan:
                     solver=item["solver"],
                     tolerances=tuple(item["tolerances"]),
                     options=item.get("options", {}),
+                    repetitions=item.get("repetitions"),
                 )
                 for item in raw["arms"]
             ),
@@ -233,7 +239,7 @@ def run_plan(plan: Plan, output: Path, *, python: str | None = None) -> Path:
             "solver": arm.solver,
             "tolerances": list(arm.tolerances),
             "options": arm.options,
-            "repetitions": plan.repetitions,
+            "repetitions": arm.repetitions or plan.repetitions,
         }
         for instance in plan.instances
         for ratio in plan.lambda_ratios
@@ -242,16 +248,46 @@ def run_plan(plan: Plan, output: Path, *, python: str | None = None) -> Path:
     with output.open("w", encoding="utf-8") as handle:
         for index, cell in enumerate(cells, start=1):
             started = time.perf_counter()
-            process = subprocess.run(
-                [python, "-m", "src.cg2026.bench", "worker"],
-                input=json.dumps(cell),
-                capture_output=True,
-                text=True,
-                env=environment,
-                timeout=None,
-                check=False,
-                cwd=str(Path(__file__).resolve().parents[2]),
-            )
+            # The timeout is enforced here, on the process, rather than inside
+            # the solver: a solver asked to bound its own runtime bounds the
+            # part it knows about, and the part that hangs is the part it does
+            # not. A killed cell is recorded as `timeout`, which is a result --
+            # "did not finish within the budget" is exactly what the benchmark
+            # is asking.
+            try:
+                process = subprocess.run(
+                    [python, "-m", "src.cg2026.bench", "worker"],
+                    input=json.dumps(cell),
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                    timeout=plan.timeout_seconds,
+                    check=False,
+                    cwd=str(Path(__file__).resolve().parents[2]),
+                )
+            except subprocess.TimeoutExpired:
+                elapsed = time.perf_counter() - started
+                handle.write(
+                    json.dumps(
+                        {
+                            **cell,
+                            "status": "timeout",
+                            "cell_wall_seconds": elapsed,
+                            "cell_index": index,
+                            "cell_total": len(cells),
+                        },
+                        sort_keys=True,
+                    )
+                    + "\n"
+                )
+                handle.flush()
+                print(
+                    f"[{index}/{len(cells)}] "
+                    f"{cell['instance'].get('family')}-{cell['solver']} "
+                    f"ratio={cell['lambda_ratio']} TIMEOUT after {elapsed:.0f}s",
+                    flush=True,
+                )
+                continue
             elapsed = time.perf_counter() - started
             if process.returncode == 0 and process.stdout.strip():
                 try:

@@ -18,9 +18,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.cg2026.data import InstanceSpec, build  # noqa: E402
-from src.cg2026.objective import Penalty, lambda_max, relative_gap  # noqa: E402
-from src.cg2026.profile_cg import profile_cg_hist  # noqa: E402
+from src.cg2026.data import InstanceSpec, build
+from src.cg2026.objective import Penalty, lambda_max, relative_gap
+from src.cg2026.profile_cg import profile_cg_hist
 
 CASES = [
     (InstanceSpec("sparse", n=2000, p=500, k=25, seed=0), 0.10),
@@ -52,9 +52,7 @@ def main() -> int:
     for spec, ratio in CASES:
         X, y, _ = build(spec)
         penalty = Penalty(lambda_1=ratio * lambda_max(X, y))
-        profile, result = profile_cg_hist(
-            X, y, penalty.lambda_1, time_limit_minutes=3.0
-        )
+        profile, result = profile_cg_hist(X, y, penalty.lambda_1, time_limit_minutes=3.0)
         entry = {
             "instance": spec.label,
             "instance_digest": spec.digest,
