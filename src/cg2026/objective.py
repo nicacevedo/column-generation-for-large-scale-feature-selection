@@ -105,30 +105,48 @@ def lambda_max(X: np.ndarray, y: np.ndarray) -> float:
     return float(2.0 * np.abs(X.T @ y).max())
 
 
-def kkt_violation(X: np.ndarray, y: np.ndarray, beta: np.ndarray, penalty: Penalty) -> float:
-    """The largest violation of the optimality conditions, in absolute units.
+def kkt_violation(
+    X: np.ndarray,
+    y: np.ndarray,
+    beta: np.ndarray,
+    penalty: Penalty,
+    *,
+    support_rtol: float = 1e-9,
+) -> float:
+    r"""The distance from zero to the subdifferential, in absolute units.
 
-    For ``F(beta) = ||y - Xb||^2 + l1||b||_1 + l2||b||^2`` the subdifferential
-    condition at coordinate ``i`` with ``g = -2X'(y - Xb) + 2*l2*b`` is
+    For ``F(beta) = ||y - Xb||^2 + l1||b||_1 + l2||b||^2`` with
+    ``g = -2X'(y - Xb) + 2 l2 b``, the optimality condition at coordinate ``i``
+    is ``0 in g_i + l1 d|b_i|``, so the violation is
 
     ```text
-    beta_i != 0 :  g_i + l1*sign(beta_i) == 0
-    beta_i == 0 :  |g_i| <= l1
+    b_i != 0 :  |g_i + l1 sign(b_i)|
+    b_i == 0 :  (|g_i| - l1)_+
     ```
 
-    so this returns ``max_i`` of ``|g_i + l1 sign(b_i)|`` on the support and
-    ``(|g_i| - l1)_+`` off it. Absolute rather than relative, and the caller
-    normalises: a relative measure needs a denominator, and every candidate
-    denominator (``lambda_1``, ``||X'y||_inf``, ``F``) flatters a different
-    solver.
+    **``support_rtol`` is not a convenience, it is a correctness requirement,
+    and getting it wrong invalidates a whole benchmark.** The two branches
+    disagree by about ``l1`` at ``b_i = 0``, and an interior-point solver never
+    returns an exact zero -- it returns ``6e-13``. Testing ``beta != 0``
+    therefore takes the *support* branch for every coordinate of a conic
+    solution and reports a violation of roughly ``l1``, which reads as "this
+    solver never converges". Measured here: a Clarabel solve whose objective
+    agreed with LARS to seven digits and whose duality gap was ``2e-4`` scored
+    a KKT violation of ``27.95`` against ``l1 = 27.87``.
 
-    This is the **one** optimality measure every solver in this project is
-    compared at, because "converged" means different things to scikit-learn's
-    duality gap, celer's, and an interior-point solver's tolerance.
+    So a coefficient counts as zero when it is below ``support_rtol`` times the
+    largest coefficient. The default is small enough that no genuinely selected
+    feature is dropped and large enough that interior-point dust is.
+
+    For a threshold-free measure, use :func:`duality_gap`, which is also a
+    certificate. This one is kept because it is the quantity the pricing rule
+    is about (see `src/cg2026/pricing.py`), and because it localises the
+    violation to a coordinate.
     """
 
     grad = -2.0 * (X.T @ (y - X @ beta)) + 2.0 * penalty.lambda_2 * beta
-    nonzero = beta != 0
+    largest = float(np.abs(beta).max()) if beta.size else 0.0
+    nonzero = np.abs(beta) > support_rtol * largest
     violation = 0.0
     if nonzero.any():
         violation = float(np.abs(grad[nonzero] + penalty.lambda_1 * np.sign(beta[nonzero])).max())
@@ -138,6 +156,22 @@ def kkt_violation(X: np.ndarray, y: np.ndarray, beta: np.ndarray, penalty: Penal
             float(np.maximum(np.abs(grad[~nonzero]) - penalty.lambda_1, 0.0).max()),
         )
     return violation
+
+
+def relative_gap(X: np.ndarray, y: np.ndarray, beta: np.ndarray, penalty: Penalty) -> float:
+    """``duality_gap / |primal|`` -- the primary accuracy measure of this project.
+
+    Threshold-free, certified, and comparable across a first-order method, an
+    interior-point method and a decomposition. Every solver in the benchmark is
+    run over a ladder of its own tolerances and this is what is read off, so
+    "time to reach accuracy epsilon" is answered by the data rather than
+    decided by each solver's idea of what its `tol` means.
+    """
+
+    primal = penalty.value(X, y, beta)
+    if primal == 0.0:
+        return 0.0
+    return duality_gap(X, y, beta, penalty) / abs(primal)
 
 
 def duality_gap(X: np.ndarray, y: np.ndarray, beta: np.ndarray, penalty: Penalty) -> float:

@@ -46,3 +46,17 @@ packages = ["src"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+# The historical code is the historical record. Linting it would invite fixing
+# it, and a fixed copy is no longer the thing that produced the 2023-2025
+# results. `src/cg2026/cg_hist_compat.py` carries the smallest diff that makes
+# `src/cg_models.py` execute in 2026 and is excluded for the same reason.
+exclude = [
+    "models.py",
+    "new_main.py",
+    "new_main_delete.py",
+    "old_main.py",
+    "stocks_data.py",
+    "synthetic_data.py",
+    "src/cg_models.py",
+    "src/cg2026/cg_hist_compat.py",
+]

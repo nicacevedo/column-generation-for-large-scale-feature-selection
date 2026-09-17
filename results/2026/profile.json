@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "cvxpy_solve_calls": 7,
+      "first_master_ms": 18.321375944651663,
+      "instance": "sparse-n2000-p500-k25-snr5-s0",
+      "instance_digest": "bc68c8ae2ce17433",
+      "iterations": 7,
+      "lambda_ratio": 0.1,
+      "last_master_ms": 82.82185101415962,
+      "master_solve_seconds": 0.33260531502310187,
+      "n": 2000,
+      "p": 500,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 5.988548132972124e-06,
+      "shares": {
+        "column_build": 0.00046848305066390526,
+        "master_solve": 0.9334831398232977,
+        "other": 0.06604837712603841,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 0.35630564799066633
+    },
+    {
+      "cvxpy_solve_calls": 7,
+      "first_master_ms": 25.536173954606056,
+      "instance": "sparse-n2000-p2000-k25-snr5-s0",
+      "instance_digest": "a39201cc0ac64742",
+      "iterations": 7,
+      "lambda_ratio": 0.1,
+      "last_master_ms": 96.70403099153191,
+      "master_solve_seconds": 0.4094017108436674,
+      "n": 2000,
+      "p": 2000,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 3.098477088338188e-06,
+      "shares": {
+        "column_build": 0.0003663119278389297,
+        "master_solve": 0.8524719958172082,
+        "other": 0.14716169225495285,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 0.4802523870021105
+    },
+    {
+      "cvxpy_solve_calls": 7,
+      "first_master_ms": 45.81000201869756,
+      "instance": "sparse-n2000-p5000-k25-snr5-s0",
+      "instance_digest": "8165a5e578fb3c17",
+      "iterations": 7,
+      "lambda_ratio": 0.1,
+      "last_master_ms": 126.67279096785933,
+      "master_solve_seconds": 0.6070261677959934,
+      "n": 2000,
+      "p": 5000,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 5.9722384043044004e-05,
+      "shares": {
+        "column_build": 0.00031522422964670466,
+        "master_solve": 0.7913504713560895,
+        "other": 0.20833430441426382,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 0.7670762699563056
+    },
+    {
+      "cvxpy_solve_calls": 59,
+      "first_master_ms": 13.773774961009622,
+      "instance": "historical-n2000-p500-s0",
+      "instance_digest": "f04ce3b48d6e78de",
+      "iterations": 59,
+      "lambda_ratio": 0.1,
+      "last_master_ms": 3587.189179030247,
+      "master_solve_seconds": 64.42091289779637,
+      "n": 2000,
+      "p": 500,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 2.1948407497260996e-06,
+      "shares": {
+        "column_build": 2.1940739797713456e-05,
+        "master_solve": 0.9912713135063177,
+        "other": 0.008706745753884623,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 64.98817429703195
+    },
+    {
+      "cvxpy_solve_calls": 87,
+      "first_master_ms": 17.056143027730286,
+      "instance": "historical-n2000-p1000-s0",
+      "instance_digest": "1fa86f691fe08a51",
+      "iterations": 88,
+      "lambda_ratio": 0.1,
+      "last_master_ms": 5411.789608071558,
+      "master_solve_seconds": 178.806473325938,
+      "n": 2000,
+      "p": 1000,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 0.19881975069557328,
+      "shares": {
+        "column_build": 1.203586890873095e-05,
+        "master_solve": 0.9880133865799156,
+        "other": 0.011974577551175725,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 180.97575979703106
+    },
+    {
+      "cvxpy_solve_calls": 19,
+      "first_master_ms": 26.630311040207744,
+      "instance": "correlated-n2000-p500-rho0.5-s0",
+      "instance_digest": "4704e3f207612a14",
+      "iterations": 19,
+      "lambda_ratio": 0.1,
+      "last_master_ms": 687.5373980728909,
+      "master_solve_seconds": 3.849973366013728,
+      "n": 2000,
+      "p": 500,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 5.102674989828763e-07,
+      "shares": {
+        "column_build": 0.0001166831058093132,
+        "master_solve": 0.9773173958514813,
+        "other": 0.02256592104270948,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 3.9393275739857927
+    },
+    {
+      "cvxpy_solve_calls": 10,
+      "first_master_ms": 16.26259705517441,
+      "instance": "correlated-n2000-p500-rho0.9-s0",
+      "instance_digest": "48719f69402856d7",
+      "iterations": 10,
+      "lambda_ratio": 0.1,
+      "last_master_ms": 145.98594000563025,
+      "master_solve_seconds": 0.7477211421355605,
+      "n": 2000,
+      "p": 500,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 4.941983353950895e-07,
+      "shares": {
+        "column_build": 0.0003807223899318863,
+        "master_solve": 0.9487778486671685,
+        "other": 0.05084142894289956,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 0.7880887429928407
+    },
+    {
+      "cvxpy_solve_calls": 51,
+      "first_master_ms": 14.62754001840949,
+      "instance": "sparse-n2000-p500-k25-snr5-s0",
+      "instance_digest": "bc68c8ae2ce17433",
+      "iterations": 51,
+      "lambda_ratio": 0.01,
+      "last_master_ms": 2871.5551119530573,
+      "master_solve_seconds": 49.68025531398598,
+      "n": 2000,
+      "p": 500,
+      "pricing_scan_seconds": 0.0,
+      "relative_gap": 1.2680590406661117e-05,
+      "shares": {
+        "column_build": 2.546720462531314e-05,
+        "master_solve": 0.9911138478827117,
+        "other": 0.008860684912663001,
+        "pricing_scan": 0.0,
+        "residual_check": 0.0
+      },
+      "total_seconds": 50.12567972904071
+    }
+  ],
+  "host": {
+    "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python": "3.12.14"
+  },
+  "note": "Threads pinned to 1 by the caller's environment. Conic solver is Clarabel: MOSEK is not licensed on this host (ASM-0002), so these are the timings of an independent solver on the historical code, never a reproduction of a MOSEK timing."
+}
