@@ -195,7 +195,7 @@ Coordinate Descent`, i.e. `SCIKIT_LASSO`. The wrapper is
 `models.py:28`:
 
 ```python
-clf = Lasso(alpha=tau/n, fit_intercept=False, max_iter=1/tol, tol=tol)
+clf = Lasso(alpha=tau / n, fit_intercept=False, max_iter=1 / tol, tol=tol)
 ```
 
 **The λ conversion is correct.** The target objective is

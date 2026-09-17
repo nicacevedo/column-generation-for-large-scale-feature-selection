@@ -59,4 +59,13 @@ exclude = [
     "synthetic_data.py",
     "src/cg_models.py",
     "src/cg2026/cg_hist_compat.py",
+    # The thesis-era notebooks, for the same reason and one more: they carry
+    # committed cell outputs, so reformatting them rewrites a record of what
+    # the author actually ran. Listed individually rather than as `*.ipynb`, so
+    # a notebook written for the 2026 reassessment would still be linted.
+    "plots.ipynb",
+    "borrar.ipynb",
+    "data-treatment.ipynb",
+    "benchmark/qp_vs_socp.ipynb",
+    "Finance/market_analysis.ipynb",
 ]

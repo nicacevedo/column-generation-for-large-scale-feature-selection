@@ -202,9 +202,7 @@ def profile_cg_hist(
     )
     profile.pricing_products = products
     profile.pricing_scan = per_product * max(products, 1)
-    profile.pricing_scan_per_iteration = per_product * (
-        products / max(profile.iterations, 1)
-    )
+    profile.pricing_scan_per_iteration = per_product * (products / max(profile.iterations, 1))
     return profile, out
 
 

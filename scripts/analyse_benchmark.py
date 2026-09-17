@@ -277,10 +277,7 @@ def main() -> int:
                     matched.append(
                         (f"{label} r={ratio}", cg_matched / best_modern_matched, cg_matched)
                     )
-        print(
-            f"{label:30} {ratio:5} {best_text:>20} {cg_text:>24} "
-            f"{excess_text:>14}  {verdict:>9}"
-        )
+        print(f"{label:30} {ratio:5} {best_text:>20} {cg_text:>24} {excess_text:>14}  {verdict:>9}")
 
     print()
     print("=" * 72)
@@ -302,8 +299,10 @@ def main() -> int:
     if matched:
         factors = sorted(f for _, f, _ in matched)
         print(f"  cells comparable   {len(matched)}")
-        print(f"  slowdown  min {factors[0]:.1f}x  median "
-              f"{statistics.median(factors):.1f}x  max {factors[-1]:.1f}x")
+        print(
+            f"  slowdown  min {factors[0]:.1f}x  median "
+            f"{statistics.median(factors):.1f}x  max {factors[-1]:.1f}x"
+        )
         for name, factor, wall in sorted(matched, key=lambda item: -item[1]):
             print(f"    {name:34} {factor:8.1f}x  (cg_hist {wall:.3f}s)")
     else:
@@ -320,10 +319,7 @@ def main() -> int:
         print(f"    {item}")
     print()
     print("OBSERVATION  does current scikit-learn converge on these instances")
-    print(
-        f"  cells reaching gap < 1e-8 without hitting max_iter: "
-        f"{sklearn_ok}/{sklearn_total}"
-    )
+    print(f"  cells reaching gap < 1e-8 without hitting max_iter: {sklearn_ok}/{sklearn_total}")
     print("  Context for the modern baseline's credibility, not a test of HYP-0005.")
     print()
     # NOT a verdict on HYP-0006. An earlier version printed this block under
