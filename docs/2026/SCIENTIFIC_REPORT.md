@@ -6,11 +6,33 @@ regression, structured as the brief's §37 asks: A–R, evidence first.
 **The short version.** The method solves the LASSO, not ℓ0. Its pricing rule is
 the maximum-violation working-set rule. Its central mathematical claim is
 correct and already written down in a private note. Both 2025 improvements were
-measured by their author and are four times slower than what they replaced. On
-every cell of a frozen benchmark measured so far it does not merely lose to
-Celer, skglm and scikit-learn — it never reaches the target accuracy at all.
+measured by their author and are at least 3.8x slower than what they replaced
+-- at least, because both of those runs were truncated at a one-minute cap.
+
+On a frozen 30-cell benchmark it loses to Celer, skglm, LARS and scikit-learn
+on **every cell**, by a median of **38.7x at a matched objective** and up to
+4530x. It loses worst in the dense-truth regime the 2023 claim was made in
+(median 269x) and least in the one regime the 2023 work never tested
+(`sparse`, median 23x).
+
 The recommendation is **TRACK F, no viable modern paper on the computational
 contribution**, with one narrow exception in §M that a human must rule on.
+
+**What this paragraph used to say, and why it was wrong.** It said the method
+"never reaches the target accuracy at all". That framing was built on the
+duality-gap certificate, and an adversarial review of the empirical case
+dismantled it: the certificate is first order in the KKT overshoot while
+objective suboptimality is second order, so on 26 of 30 cells the method's
+*answer* matches the best any solver found to between 1.1e-14 and 5.9e-10 while
+failing the certificate. It is not inaccurate; it is slow. Worse for the old
+framing, the certificate ladder was inert for this arm through a one-line
+adapter decision (§K.1). The conclusion is unchanged and now rests on evidence
+that does not depend on any of that. §K.1 and §K.4 list every retraction.
+
+**The engineering half of this work** is reported separately, as the brief's
+§37 asks, in `docs/RC_THESIS_PILOT_REPORT.md` on branch `rc/thesis-pilot` of
+the Research OS repository (see `docs/2026/RESEARCH_OS.md` for which repository
+that is). Nothing of Research OS is vendored here.
 
 ---
 
