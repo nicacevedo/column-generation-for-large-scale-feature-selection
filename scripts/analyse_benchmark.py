@@ -59,6 +59,26 @@ def time_to_target(records: list[dict[str, Any]]) -> tuple[float | None, float |
     return best if best else (None, None)
 
 
+def best_gap(records: list[dict[str, Any]]) -> tuple[float | None, float | None]:
+    """The tightest accuracy a solver reached at all, and what it cost.
+
+    "Did not reach 1e-6" is the decision rule's answer and it is not the
+    informative one. A solver that stops at 3e-5 and one that stops at 0.2 are
+    both "did not reach it" and they are not the same result.
+    """
+
+    best: tuple[float, float] | None = None
+    for record in records:
+        if record.get("status") not in {"ok", "time_limit"}:
+            continue
+        gap = record.get("relative_gap")
+        if gap is None:
+            continue
+        if best is None or float(gap) < best[0]:
+            best = (float(gap), float(record["wall_seconds"]))
+    return best if best else (None, None)
+
+
 def main() -> int:
     path = Path(sys.argv[1] if len(sys.argv) > 1 else "results/2026/EXP-0001.jsonl")
     cells: dict[tuple[str, float], dict[str, Any]] = defaultdict(dict)
@@ -86,7 +106,7 @@ def main() -> int:
     print(f"arms that produced no records: {len(incomplete)}")
     print()
 
-    header = f"{'instance':34} {'ratio':>6} {'best modern':>22} {'cg_hist':>22}  {'verdict':>9}"
+    header = f"{'instance':34} {'ratio':>6} {'best modern':>22} {'cg_hist':>26}  {'verdict':>9}"
     print(header)
     print("-" * len(header))
 
@@ -146,8 +166,14 @@ def main() -> int:
                     f"{label} r={ratio}: cg_hist {cg_wall:.4f}s "
                     f"<= {best_name} {modern[best_name]:.4f}s"
                 )
-        cg_text = "did not reach 1e-6" if cg_wall is None else f"{cg_wall:.4f}s"
-        print(f"{label:34} {ratio:6} {best_text:>22} {cg_text:>22}  {verdict:>9}")
+        if cg_wall is None and cg_row and "records" in cg_row:
+            gap, wall = best_gap(cg_row["records"])
+            cg_text = f"best gap {gap:.2g} in {wall:.1f}s" if gap is not None else "no result"
+        elif cg_wall is None:
+            cg_text = "no result"
+        else:
+            cg_text = f"{cg_wall:.4f}s"
+        print(f"{label:34} {ratio:6} {best_text:>22} {cg_text:>26}  {verdict:>9}")
 
     print()
     print("=" * 72)

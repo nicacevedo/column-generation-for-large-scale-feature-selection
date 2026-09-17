@@ -225,9 +225,33 @@ HYP-0006   REJECTED -- 2 cells recorded a non-zero Lagrangian bound count
 The result is stronger than `HYP-0001` predicted and weaker than `HYP-0006`
 claimed, and both matter.
 
-**Stronger:** `cg_hist` does not merely lose. It **never reaches a relative
-duality gap of 1e-6 at all**, at any of its three tolerances, in any cell
-measured. The best modern solver reaches it in 10–210 ms.
+**Stronger, and stated more carefully than a first draft of this sentence
+had it.** `cg_hist` does not reach a relative duality gap of 1e-6 in any cell
+measured, at any of its three tolerances. But "never reaches it" reads as a
+catastrophe everywhere and the data does not say that; what it says is two
+different things in two regimes:
+
+```text
+                                        best modern       cg_hist best gap / time
+sparse n=2000 p=500   ratio 0.5         skglm  0.0105 s   2.0e-06 in   0.3 s
+sparse n=2000 p=500   ratio 0.1         skglm  0.0118 s   6.0e-06 in   0.4 s
+sparse n=2000 p=5000  ratio 0.5         celer  0.0910 s   1.7e-06 in   0.6 s
+sparse n=500  p=5000  ratio 0.1         skglm  0.0313 s   5.2e-06 in   1.6 s
+sparse n=2000 p=500   ratio 0.02        sklearn 0.0133 s  2.5e-06 in   6.3 s
+sparse n=500  p=5000  ratio 0.02        skglm  0.1146 s   2.2e-05 in  76.0 s
+sparse n=2000 p=5000  ratio 0.02        skglm  0.2076 s   1.2e-01 in 121.3 s   (hit its limit)
+sparse n=10000 p=1000 ratio 0.5         sklearn 0.1007 s  no result             (timed out)
+```
+
+On easy cells it **stops just short**, at a few times 1e-6, in 0.3–1.6 s —
+30× to 60× slower than the best modern solver and short of the target by a
+factor of two to six. On the sparsest penalties it degrades sharply: 76 s for
+2.2e-05, and 121 s for 0.12, which is its own two-minute limit rather than
+convergence.
+
+The pattern is the profile (§I): the cost is the restricted master, the master
+grows with the support, and the sparsest penalty is where the most columns are
+generated before anything settles. Nothing here needs "never" to carry it.
 
 **Weaker:** `HYP-0006` said the method never computes a Lagrangian lower bound
 and the preregistered rule said one non-zero count rejects it. Two cells have
