@@ -1,0 +1,51 @@
+id: Q-0011
+type: question
+schema_version: 1
+status: open
+title: What is the set of 'reachable' dual points that HYP-0004 quantifies over?
+notes: 'Promoted from proposal PROP-19700101T000000Z-33ec307e, item PR-009.
+
+  Basis: prospective.
+
+  Proposed by claude / claude-opus-5.
+
+
+  Rationale as proposed:
+
+  This is a small definitional gap that silently determines what the most correctness-relevant
+  hypothesis in the project means, and it blocks the interpretation of PR-005''s negative
+  branch. It is the kind of thing that is cheap to fix before the experiment and expensive
+  to argue about after.
+
+
+  Expected direction as proposed:
+
+  Option (b) is the defensible reading: it makes the claim about the decomposition rather
+  than about one implementation, and it is the reading under which a violation invalidates
+  the bound as a matter of method rather than of code.
+
+
+  Grounded in runtime findings (noncanonical; see `researchctl runtime findings`):
+
+  FIND-20260917T183904Z-9b053d6e
+
+
+  Risks as proposed:
+
+  Choosing the quantifier after seeing PR-005''s output would make the result unfalsifiable;
+  this must be settled first.
+
+
+  This is a DRAFT created by a human promoting an automated proposal. Nothing about it has
+  been scientifically reviewed or accepted.'
+created_from:
+- HYP-0004
+- Q-0002
+statement: 'HYP-0004 asserts that ''there exist reachable dual points at which it exceeds
+  the primal optimum''. The project has no definition of reachable. Candidates that give materially
+  different claims: (a) the iterates actually produced by the historical loop on some instance;
+  (b) any optimal dual of a restricted master over some subset of coordinates; (c) any point
+  in the dual feasible region of some restricted master, optimal or not. Under (a) the claim
+  is about this implementation; under (b) it is about the decomposition; under (c) it is nearly
+  vacuous. Until one is fixed, a null result from PR-005 cannot be interpreted, because a
+  search over (a) that finds nothing says nothing about (b).'
