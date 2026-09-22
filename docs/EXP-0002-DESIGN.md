@@ -68,7 +68,7 @@ alongside, never substituted for the primary.
 
 One number in one JSON document:
 
-    results/2026/EXP-0002-sweep.json    ->    portability.R
+    results/2026/sweep.json    ->    portability.R
 
 `portability_wall_clock.R` carries the same computation over `wall_seconds`
 and is secondary.
@@ -81,9 +81,9 @@ are 1–6 s; the estimate for the full sweep is 10–30 minutes.
 
 ## Expected artifacts
 
-    results/2026/EXP-0002-sweep.json          the analysed document (declared)
-    results/2026/EXP-0002-sweep.jsonl         one line per cell, beside it
-    results/2026/EXP-0002-sweep.manifest.json plan digest and environment
+    results/2026/sweep.json                  the analysed document (declared)
+    results/2026/sweep.jsonl                 one line per cell, beside it
+    results/2026/sweep.manifest.json         plan digest and environment
 
 A **schema exemplar** is committed at the document path so Research OS can
 show a designer that  exists before any real run -- it lists

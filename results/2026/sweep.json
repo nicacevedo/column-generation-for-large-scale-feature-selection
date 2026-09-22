@@ -32,10 +32,10 @@
     "fold_change": {
       "lambda": 8.333333333333334,
       "lambda_lower": 8.333333333333334,
-      "lambda_upper": 4.166666666666667,
+      "lambda_upper": 1.0,
       "support": 1.8,
       "support_lower": 1.8,
-      "support_upper": 1.6
+      "support_upper": 1.4
     },
     "status": "ok",
     "window_tolerance": 0.1
@@ -65,15 +65,15 @@
     },
     "wall_seconds": {
       "sparse-n300-p60-k8-snr5-s0": {
-        "best_cost": 0.04179334605578333,
+        "best_cost": 0.043048604973591864,
         "lambda_lower": 0.06,
-        "lambda_upper": 0.12,
+        "lambda_upper": 0.5,
         "points_in_window": 2,
         "support_lower": 9.0,
-        "support_upper": 8.0
+        "support_upper": 7.0
       },
       "toeplitz-n300-p60-rho0.8-s0": {
-        "best_cost": 0.049922658945433795,
+        "best_cost": 0.04407428693957627,
         "lambda_lower": 0.5,
         "lambda_upper": 0.5,
         "points_in_window": 1,
