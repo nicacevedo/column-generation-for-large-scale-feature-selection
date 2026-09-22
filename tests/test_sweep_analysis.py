@@ -253,3 +253,40 @@ def test_both_window_edges_are_folded_and_the_larger_is_taken() -> None:
     assert out["fold_change"]["lambda_lower"] == pytest.approx(1.0)
     assert out["fold_change"]["lambda_upper"] == pytest.approx(9.0)
     assert out["fold_change"]["lambda"] == pytest.approx(9.0), "the stable edge won"
+
+
+def test_the_single_command_writes_a_document_a_rule_can_read(tmp_path: Path) -> None:
+    """`run_sweep` exists because the bridge binds one command per experiment.
+
+    Two commands would need two experiments and a way to pass an artifact
+    between them, which that layer deliberately does not have. This checks
+    the composition end to end on the smallest real sweep: two designs,
+    three lambda, one repetition -- real solves, not fixtures.
+    """
+
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({
+        "arms": [{"options": {}, "repetitions": 1, "solver": "cg_hist",
+                  "tolerances": [1e-06]}],
+        "instances": [
+            {"family": "sparse", "k": 5, "n": 200, "p": 40, "seed": 0, "snr": 5.0},
+            {"family": "toeplitz", "k": 5, "n": 200, "p": 40, "rho": 0.8,
+             "seed": 0, "snr": 5.0},
+        ],
+        "lambda_ratios": [0.5, 0.25, 0.1],
+        "repetitions": 1, "threads": 1, "timeout_seconds": 120,
+    }))
+    out = tmp_path / "doc.json"
+    done = subprocess.run(
+        [sys.executable, "scripts/run_sweep.py", "--plan", str(plan), "--out", str(out)],
+        cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+    assert out.exists() and out.with_suffix(".jsonl").exists()
+    assert out.with_suffix(".manifest.json").exists()
+    document = json.loads(out.read_text())
+    assert document["schema"] == "cg2026.sweep.v1"
+    assert document["design_count"] == 2
+    assert "plan_digest" in document
+    # The path a preregistered rule names must exist or say why not.
+    assert "R" in document["portability"] or document["portability"]["status"]
