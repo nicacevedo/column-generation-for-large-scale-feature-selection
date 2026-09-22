@@ -53,6 +53,9 @@ class InstanceSpec:
     noise_fraction: float = 0.1
     #: `illcond` only: the condition number of the design's Gram matrix.
     condition: float = 1.0
+    #: `block` only: columns per correlated block. The last block is short when
+    #: `p` is not a multiple of it.
+    block_size: int = 50
     standardise: bool = True
 
     @property
@@ -66,8 +69,10 @@ class InstanceSpec:
         core = f"{self.family}-n{self.n}-p{self.p}"
         if self.family == "sparse":
             core += f"-k{self.k}-snr{self.snr:g}"
-        if self.family == "correlated":
+        if self.family in {"correlated", "toeplitz"}:
             core += f"-rho{self.rho:g}"
+        if self.family == "block":
+            core += f"-rho{self.rho:g}-b{self.block_size}"
         if self.family == "illcond":
             core += f"-cond{self.condition:g}"
         return f"{core}-s{self.seed}"
@@ -80,6 +85,8 @@ def build(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray | None
         "historical": _historical,
         "sparse": _sparse,
         "correlated": _correlated,
+        "toeplitz": _toeplitz,
+        "block": _block,
         "illcond": _illcond,
     }[spec.family]
     X, y, truth = builder(spec)
@@ -186,6 +193,80 @@ def _correlated(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, None]:
         noise_cols = rng.choice(spec.p, n_noise, replace=False)
         X[:, noise_cols] = rng.normal(0, 1, (spec.n, n_noise))
     return X, y, None
+
+
+def _toeplitz(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """AR(1) columns: ``cov(i, j) = rho ** |i - j|``, with a `sparse` truth.
+
+    Deliberately identical to :func:`_sparse` in everything except the column
+    covariance -- same `k`, same SNR construction, same coefficient law -- so
+    that a sweep across families varies the design and nothing else. That is
+    what makes "the fast window moved when the correlation structure changed"
+    a statement about correlation structure.
+
+    Built by the AR(1) recursion rather than by factorising a `p x p` Toeplitz
+    matrix: `x_j = rho x_{j-1} + sqrt(1 - rho^2) e_j` has exactly that
+    covariance, costs `O(np)` instead of `O(p^3)`, and stays affordable at the
+    `p` this project benchmarks at.
+    """
+
+    if not 0.0 <= spec.rho < 1.0:
+        raise ValueError("rho must be in [0, 1)")
+    rng = np.random.default_rng(spec.seed)
+    noise = rng.standard_normal((spec.n, spec.p))
+    X = np.empty((spec.n, spec.p))
+    X[:, 0] = noise[:, 0]
+    root = np.sqrt(1.0 - spec.rho**2)
+    for j in range(1, spec.p):
+        X[:, j] = spec.rho * X[:, j - 1] + root * noise[:, j]
+    return _with_sparse_signal(X, spec, rng)
+
+
+def _block(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Equicorrelated within blocks of `block_size`, independent across them.
+
+    The third structure the portability question asks for, and the one that
+    separates "correlation" from "distance in the column ordering": AR(1)
+    correlation decays with `|i - j|` and block correlation does not, so a
+    result that holds for one and not the other is informative about which
+    property matters.
+
+    Same closed form as :func:`_correlated`, applied per block: with a shared
+    `w` per block and independent `z`, ``sqrt(rho) w + sqrt(1 - rho) z`` is
+    equicorrelated at `rho`.
+    """
+
+    if not 0.0 <= spec.rho < 1.0:
+        raise ValueError("rho must be in [0, 1)")
+    if spec.block_size < 1:
+        raise ValueError("block_size must be at least 1")
+    rng = np.random.default_rng(spec.seed)
+    own = rng.standard_normal((spec.n, spec.p))
+    X = np.empty((spec.n, spec.p))
+    root_rho, root_rest = np.sqrt(spec.rho), np.sqrt(1.0 - spec.rho)
+    for start in range(0, spec.p, spec.block_size):
+        stop = min(start + spec.block_size, spec.p)
+        common = rng.standard_normal((spec.n, 1))
+        X[:, start:stop] = root_rho * common + root_rest * own[:, start:stop]
+    return _with_sparse_signal(X, spec, rng)
+
+
+def _with_sparse_signal(
+    X: np.ndarray, spec: InstanceSpec, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """`_sparse`'s response, over a design somebody else drew.
+
+    Factored out so the correlated families cannot drift from the independent
+    one in the part that is supposed to be held fixed.
+    """
+
+    beta = np.zeros(spec.p)
+    support = rng.choice(spec.p, spec.k, replace=False)
+    beta[support] = rng.choice([-1.0, 1.0], spec.k) * rng.uniform(1.0, 3.0, spec.k)
+    signal = X @ beta
+    noise = rng.standard_normal(spec.n)
+    noise *= np.linalg.norm(signal) / (spec.snr * np.linalg.norm(noise))
+    return X, signal + noise, beta
 
 
 def _illcond(spec: InstanceSpec) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

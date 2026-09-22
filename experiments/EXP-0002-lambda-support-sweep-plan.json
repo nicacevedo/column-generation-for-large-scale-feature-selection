@@ -1,0 +1,22 @@
+{
+  "arms": [
+    {
+      "options": {},
+      "repetitions": 3,
+      "solver": "cg_hist",
+      "tolerances": [1e-06]
+    }
+  ],
+  "instances": [
+    {"family": "sparse", "k": 25, "n": 2000, "p": 500, "seed": 0, "snr": 5.0},
+    {"family": "toeplitz", "k": 25, "n": 2000, "p": 500, "rho": 0.3, "seed": 0, "snr": 5.0},
+    {"family": "toeplitz", "k": 25, "n": 2000, "p": 500, "rho": 0.6, "seed": 0, "snr": 5.0},
+    {"family": "toeplitz", "k": 25, "n": 2000, "p": 500, "rho": 0.9, "seed": 0, "snr": 5.0},
+    {"family": "block", "block_size": 50, "k": 25, "n": 2000, "p": 500, "rho": 0.6, "seed": 0, "snr": 5.0},
+    {"family": "block", "block_size": 50, "k": 25, "n": 2000, "p": 500, "rho": 0.9, "seed": 0, "snr": 5.0}
+  ],
+  "lambda_ratios": [0.9, 0.7, 0.5, 0.35, 0.25, 0.18, 0.12, 0.09, 0.06, 0.045, 0.03, 0.02],
+  "repetitions": 3,
+  "threads": 1,
+  "timeout_seconds": 300
+}
