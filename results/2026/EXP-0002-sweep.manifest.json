@@ -1,0 +1,23 @@
+{
+  "document": "results/2026/EXP-0002-sweep.json",
+  "environment": {
+    "celer": "0.7.4",
+    "clarabel": "0.11.1",
+    "cvxpy": "1.9.2",
+    "git_commit": "5243100c581680bd2abde9ac48ec289229784831",
+    "git_dirty": "True",
+    "numpy": "2.5.3",
+    "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+    "python": "3.12.14",
+    "scipy": "1.18.1",
+    "skglm": "0.5",
+    "sklearn": "1.9.1",
+    "threads": "{\"MKL_NUM_THREADS\": \"1\", \"NUMEXPR_NUM_THREADS\": \"1\", \"OMP_NUM_THREADS\": \"1\", \"OPENBLAS_NUM_THREADS\": \"1\", \"RAYON_NUM_THREADS\": \"1\", \"VECLIB_MAXIMUM_THREADS\": \"1\"}"
+  },
+  "plan_digest": "1f13432a87255b4e663b76cbc3f864067c831a2471d9cd532ce192f52330e5b2",
+  "plan_file_sha256": "e26901a9787d44e3f881a36945eafe56f3ae18f5bbc27a5dff1c11a90b2989cb",
+  "plan_path": "experiments/EXP-0002-schema-example-plan.json",
+  "results": "results/2026/EXP-0002-sweep.jsonl",
+  "solver": "cg_hist",
+  "window_tolerance": 0.1
+}

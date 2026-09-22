@@ -290,3 +290,53 @@ def test_the_single_command_writes_a_document_a_rule_can_read(tmp_path: Path) ->
     assert "plan_digest" in document
     # The path a preregistered rule names must exist or say why not.
     assert "R" in document["portability"] or document["portability"]["status"]
+
+
+def test_the_preregisterable_path_survives_the_schema_listing() -> None:
+    """The document must stay small enough for Research OS to show the point of it.
+
+    Research OS lets a designer name a metric path only if it can show that
+    the path exists, and it shows the first 40 numeric paths of a committed
+    output **in sorted order**. An earlier version of this document also
+    carried a `by_cost` tree and every (design, lambda) point -- about 600
+    paths at the real sweep's size -- and `portability.R` sorted well past
+    the cut. The designer would have been shown forty paths under
+    `by_cost.` and would have refused the idea again, correctly, for having
+    no usable metric. That is the bug this instrument exists to remove, so
+    it must not reintroduce it.
+
+    40 is Research OS's constant, restated here rather than imported: this
+    repository does not depend on that one, and a silent change there should
+    fail here loudly.
+    """
+
+    limit = 40
+    designs = [f"design-{i}" for i in range(8)]
+    lambdas = [0.9, 0.7, 0.5, 0.35, 0.25, 0.18, 0.12, 0.09, 0.06, 0.045, 0.03, 0.02]
+    rows = [
+        cell(design, ratio, 10 if index == position else 50 + index, 5 + index * 3,
+             seconds=(10 if index == position else 50 + index) * 0.2, reps=3)
+        for position, design in enumerate(designs)
+        for index, ratio in enumerate(lambdas)
+    ]
+    document = analyse(rows, solver="cg_hist", tolerance=0.10)
+    paths = sorted(_numeric_paths(document))
+    assert "portability.R" in paths[:limit], (
+        f"portability.R sorted to {paths.index('portability.R')}, past the "
+        f"first {limit} a designer is shown"
+    )
+
+
+def _numeric_paths(node, prefix: str = "") -> list[str]:
+    """The same walk Research OS does: dotted paths to every finite number."""
+
+    found: list[str] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            found += _numeric_paths(value, f"{prefix}.{key}" if prefix else str(key))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found += _numeric_paths(value, f"{prefix}.{index}")
+    elif isinstance(node, int | float) and not isinstance(node, bool):
+        found.append(prefix)
+    return found

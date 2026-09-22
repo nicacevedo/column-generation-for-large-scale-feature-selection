@@ -1,0 +1,85 @@
+{
+  "cell_count": 8,
+  "design_count": 2,
+  "plan_digest": "1f13432a87255b4e663b76cbc3f864067c831a2471d9cd532ce192f52330e5b2",
+  "portability": {
+    "R": 0.216,
+    "cost": "iterations",
+    "design_count": 2,
+    "designs": [
+      "sparse-n300-p60-k8-snr5-s0",
+      "toeplitz-n300-p60-rho0.8-s0"
+    ],
+    "fold_change": {
+      "lambda": 8.333333333333334,
+      "lambda_lower": 8.333333333333334,
+      "lambda_upper": 1.0,
+      "support": 1.8,
+      "support_lower": 1.8,
+      "support_upper": 1.4
+    },
+    "status": "ok",
+    "window_tolerance": 0.1
+  },
+  "portability_wall_clock": {
+    "R": 0.216,
+    "cost": "wall_seconds",
+    "design_count": 2,
+    "designs": [
+      "sparse-n300-p60-k8-snr5-s0",
+      "toeplitz-n300-p60-rho0.8-s0"
+    ],
+    "fold_change": {
+      "lambda": 8.333333333333334,
+      "lambda_lower": 8.333333333333334,
+      "lambda_upper": 4.166666666666667,
+      "support": 1.8,
+      "support_lower": 1.8,
+      "support_upper": 1.6
+    },
+    "status": "ok",
+    "window_tolerance": 0.1
+  },
+  "problems": [],
+  "schema": "cg2026.sweep.v1",
+  "solver": "cg_hist",
+  "window_tolerance": 0.1,
+  "windows": {
+    "iterations": {
+      "sparse-n300-p60-k8-snr5-s0": {
+        "best_cost": 4.0,
+        "lambda_lower": 0.06,
+        "lambda_upper": 0.5,
+        "points_in_window": 4,
+        "support_lower": 9.0,
+        "support_upper": 7.0
+      },
+      "toeplitz-n300-p60-rho0.8-s0": {
+        "best_cost": 4.0,
+        "lambda_lower": 0.5,
+        "lambda_upper": 0.5,
+        "points_in_window": 1,
+        "support_lower": 5.0,
+        "support_upper": 5.0
+      }
+    },
+    "wall_seconds": {
+      "sparse-n300-p60-k8-snr5-s0": {
+        "best_cost": 0.04179334605578333,
+        "lambda_lower": 0.06,
+        "lambda_upper": 0.12,
+        "points_in_window": 2,
+        "support_lower": 9.0,
+        "support_upper": 8.0
+      },
+      "toeplitz-n300-p60-rho0.8-s0": {
+        "best_cost": 0.049922658945433795,
+        "lambda_lower": 0.5,
+        "lambda_upper": 0.5,
+        "points_in_window": 1,
+        "support_lower": 5.0,
+        "support_upper": 5.0
+      }
+    }
+  }
+}

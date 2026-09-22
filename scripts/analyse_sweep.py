@@ -207,44 +207,53 @@ def portability(
 
 
 def analyse(rows: list[dict[str, Any]], *, solver: str, tolerance: float) -> dict[str, Any]:
+    """The analysis, and deliberately not a copy of the data.
+
+    **Kept small on purpose.** Research OS shows a designer the numeric paths
+    of a committed output so it can name one in a preregistered rule, and it
+    shows the first `MAX_SCHEMA_PATHS` of them in sorted order. An earlier
+    version of this document also carried a `by_cost` tree and every
+    (design, lambda) point -- around 600 paths for the real sweep -- and
+    `portability.R`, the only path anybody would ever preregister, sorted
+    past the cut. The designer would have seen forty paths under `by_cost.`
+    and concluded, correctly, that it had been shown no usable metric.
+
+    So the document holds the analysis and the per-design window boundaries
+    that show its working, and the raw curve stays in the JSON Lines stream
+    written beside it, which is where a reader who wants to recompute this
+    should be looking anyway.
+    """
+
     summary = summarise_cells(rows, solver)
     cells = summary["cells"]
     by_design: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for entry in cells.values():
         by_design[entry["design"]].append(entry)
 
-    document: dict[str, Any] = {
+    windows: dict[str, dict[str, dict[str, Any]]] = {}
+    verdicts: dict[str, dict[str, Any]] = {}
+    for cost in COSTS:
+        found = {}
+        for design, points in by_design.items():
+            window = fast_window(points, cost, tolerance)
+            if window is not None:
+                found[design] = window
+        windows[cost] = found
+        verdicts[cost] = portability(found, cost=cost, tolerance=tolerance)
+
+    return {
         "schema": "cg2026.sweep.v1",
         "solver": solver,
         "window_tolerance": tolerance,
         "design_count": len(by_design),
         "cell_count": len(cells),
         "problems": summary["problems"],
-        "designs": {},
-        "by_cost": {},
+        # The preregisterable scalars, at shallow paths that sort early.
+        "portability": verdicts["iterations"],
+        "portability_wall_clock": verdicts["wall_seconds"],
+        # The working: where each design's window sits, on both axes.
+        "windows": windows,
     }
-    for cost in COSTS:
-        windows = {}
-        for design, points in by_design.items():
-            window = fast_window(points, cost, tolerance)
-            if window is not None:
-                windows[design] = window
-        document["by_cost"][cost] = {
-            "windows": windows,
-            "portability": portability(windows, cost=cost, tolerance=tolerance),
-        }
-    for design, points in sorted(by_design.items()):
-        ordered = sorted(points, key=lambda pt: pt["lambda_ratio"])
-        document["designs"][design] = {
-            "points": ordered,
-            "lambda_ratios": [pt["lambda_ratio"] for pt in ordered],
-        }
-    # The preregisterable scalars, hoisted to stable shallow paths so a rule
-    # names `portability.R` rather than a path through a solver name.
-    primary = document["by_cost"]["iterations"]["portability"]
-    document["portability"] = primary
-    document["portability_wall_clock"] = document["by_cost"]["wall_seconds"]["portability"]
-    return document
 
 
 def main(argv: list[str] | None = None) -> int:

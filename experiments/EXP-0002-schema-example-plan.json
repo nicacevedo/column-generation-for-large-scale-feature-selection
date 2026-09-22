@@ -1,0 +1,4 @@
+{"arms":[{"options":{},"repetitions":1,"solver":"cg_hist","tolerances":[1e-06]}],
+ "instances":[{"family":"sparse","k":8,"n":300,"p":60,"seed":0,"snr":5.0},
+              {"family":"toeplitz","k":8,"n":300,"p":60,"rho":0.8,"seed":0,"snr":5.0}],
+ "lambda_ratios":[0.5,0.25,0.12,0.06],"repetitions":1,"threads":1,"timeout_seconds":120}

@@ -81,9 +81,17 @@ are 1–6 s; the estimate for the full sweep is 10–30 minutes.
 
 ## Expected artifacts
 
-    results/2026/EXP-0002.jsonl          one line per cell, from run_benchmark
-    results/2026/EXP-0002-sweep.json     the analysed document
-    results/2026/EXP-0002.manifest.json  written by run_benchmark
+    results/2026/EXP-0002-sweep.json          the analysed document (declared)
+    results/2026/EXP-0002-sweep.jsonl         one line per cell, beside it
+    results/2026/EXP-0002-sweep.manifest.json plan digest and environment
+
+A **schema exemplar** is committed at the document path so Research OS can
+show a designer that  exists before any real run -- it lists
+the numeric paths of a committed output, keys and types only, never values.
+That exemplar comes from , a two-design,
+four-lambda miniature, and it carries its own . It is therefore
+self-evidently not the EXP-0002 result, whose plan digest is
+. The real run overwrites it.
 
 ## Failure semantics
 
